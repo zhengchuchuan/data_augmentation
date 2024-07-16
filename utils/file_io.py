@@ -1,3 +1,6 @@
+import json
+
+
 def read_yolo_labels(file_path):
     labels = []
     with open(file_path, 'r',encoding='utf-8') as file:
@@ -17,21 +20,23 @@ def read_yolo_labels(file_path):
 
 
 # 读取VOC标签文件
-def read_voc_labels(label_path):
-    tree = ET.parse(label_path)
-    root = tree.getroot()
+def read_labelme_json(json_file):
+    with open(json_file, 'r') as f:
+        data = json.load(f)
 
-    labels = []
-    for obj in root.findall('object'):
-        class_name = obj.find('name').text
-        bndbox = obj.find('bndbox')
-        xmin = int(bndbox.find('xmin').text)
-        ymin = int(bndbox.find('ymin').text)
-        xmax = int(bndbox.find('xmax').text)
-        ymax = int(bndbox.find('ymax').text)
-        labels.append((class_name, xmin, ymin, xmax, ymax))
+    annotations = []
+    for shape in data['shapes']:
+        label = shape['label']
+        points = shape['points']
+        group_id = shape.get('group_id', None)  # Optional, if group_id exists
 
-    return labels
+        annotations.append({
+            'label': label,
+            'points': points,
+            'group_id': group_id
+        })
+
+    return annotations
 
 def read_bbox_labels(file_path):
     """
@@ -74,3 +79,5 @@ def read_lines_to_list(file_path):
         for line in file:
             lines.append(line.strip())  # 去除每行末尾的换行符并加入到列表中
     return lines
+
+

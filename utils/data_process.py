@@ -213,3 +213,25 @@ def random_sub_label(bbox_label, width_ratio, height_ratio):
     sub_bbox_label = (class_id, new_x1, new_y1, new_x2, new_y2)
 
     return sub_bbox_label
+
+def labelme_json_to_bbox(labelme_annotations):
+    bbox_annotations = []
+    for annotation in labelme_annotations:
+
+        label = annotation['label']
+        points = annotation['points']
+
+        # Calculate bbox from points (assuming points are in [x, y] format)
+        x_coords = [point[0] for point in points]
+        y_coords = [point[1] for point in points]
+        xmin = min(x_coords)
+        xmax = max(x_coords)
+        ymin = min(y_coords)
+        ymax = max(y_coords)
+
+        bbox_annotations.append({
+            'label': label,
+            'bbox': [xmin, ymin, xmax, ymax]
+        })
+
+    return bbox_annotations

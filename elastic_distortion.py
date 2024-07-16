@@ -9,12 +9,7 @@ from tqdm import tqdm
 from utils.utils import generate_random_transform_matrix
 from utils.transforms import elastic_transform, perspective_transform
 from utils.data_process import center_bbox_to_corner_bbox, random_sub_label
-from utils.file_io import read_yolo_labels
-
-
-
-
-
+from utils.file_io import read_yolo_labels, read_labelme_json
 
 jpg_path = None
 label_path = r'C:\Users\zcc\project\wayho\oil_detection\oil_identification\image_expansion\data\labels\MAX_20240608_MAX_0001_Color_D.txt'
@@ -31,8 +26,13 @@ jpg = cv2.imread(jpg_path)
 jpg_height, jpg_weight, _ = jpg.shape
 jpg_center = (jpg_weight // 2, jpg_height // 2)
 # 读取标签
-yolo_labels = read_yolo_labels(label_path)
-bbox_labels = center_bbox_to_corner_bbox(yolo_labels, jpg_height, jpg_weight)
+suffix = os.path.splitext(label_path)[1]
+if suffix == '.txt':
+    yolo_labels = read_yolo_labels(label_path)
+    bbox_labels = center_bbox_to_corner_bbox(yolo_labels, jpg_height, jpg_weight)
+elif suffix == '.json':
+    bbox_labels = read_labelme_json(label_path)
+    bbox_labels = labelme_json_to_bbox(bbox_labels)
 
 cut_imgs = []
 
@@ -82,7 +82,4 @@ for i in tqdm(range(random_times)):
         result = cv2.seamlessClone(perspective_transformed_img, result, mask, random_cneter, cv2.MIXED_CLONE)
 
     cv2.imwrite(f'{result_path}/{file_name_no_ext}_{i}.png', result)
-# cv2.imwrite(f'{result_path}/mask.png', mask)
-# cv2.imwrite(f'{result_path}/labeled_patch_img.png', labeled_patch_img)
-# cv2.imwrite(f'{result_path}/perspective_transformed_img.png', perspective_transformed_img)
 
