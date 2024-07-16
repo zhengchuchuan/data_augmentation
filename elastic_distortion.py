@@ -6,7 +6,7 @@ import numpy as np
 from scipy.ndimage import gaussian_filter, map_coordinates
 from tqdm import tqdm
 
-from utils.utils import generate_random_transform_matrix
+from utils.utils import generate_random_transform_matrix, rectangle_union
 from utils.transforms import elastic_transform, perspective_transform
 from utils.data_process import center_bbox_to_corner_bbox, random_sub_label, labelme_json_to_bbox
 from utils.file_io import read_yolo_labels,read_labelme_json
@@ -28,9 +28,12 @@ if not os.path.exists(img_path):
 if not os.path.exists(img_path):
     raise ValueError(f'图像文件不存在：{img_path}')
 
-
-if not os.path.exists(result_path):
-    os.makedirs(result_path)
+result_imgs_path = f'{result_path}/imgs'
+result_labels_path = f'{result_path}/labels'
+if not os.path.exists(result_imgs_path):
+    os.makedirs(result_imgs_path)
+if not os.path.exists(result_labels_path):
+    os.makedirs(result_labels_path)
 
 # 读取图像
 img = cv2.imread(img_path)
@@ -45,7 +48,7 @@ elif label_suffix == '.json':
     bbox_labels = labelme_json_to_bbox(bbox_labels)
 
 cut_imgs = []
-
+new_labels = []
 random_times = 20
 for i in tqdm(range(random_times)):
     result = img
@@ -69,7 +72,7 @@ for i in tqdm(range(random_times)):
         perspective_transformed_img, transformed_bbox, transformed_mask = perspective_transform(elastic_transformed_img, mask, transform_matrix, bbox_label, )
 
 
-
+        _, trans_x1, trans_y1, trans_x2, trans_y2 = transformed_bbox
         d_rate = 0.2
         dx = np.random.randint(- width*d_rate, width*d_rate)
         dy = np.random.randint(- height*d_rate, height*d_rate)
@@ -91,9 +94,19 @@ for i in tqdm(range(random_times)):
         -MONOCHROME_TRANSFER: 不保留src图像的颜色细节，只有src图像的质地，颜色和目标图像一样，可以用来进行皮肤质地填充。
 
         """
+        rect1 = ((x1, y1), (x2, y2))
+        rect2 = ((trans_x1,trans_y1),(trans_x2,trans_y2))
+        new_rect =  rectangle_union(rect1, rect2)
+        new_label = (class_id, new_rect[0][0], new_rect[0][1], new_rect[1][0], new_rect[1][1])
+        new_labels.append(new_label)
+
         result = cv2.seamlessClone(perspective_transformed_img, result, transformed_mask, random_cneter, cv2.MIXED_CLONE)
 
-    cv2.imwrite(f'{result_path}/{file_name_without_suffix}_{i}.png', result)
+    cv2.imwrite(f'{result_imgs_path}/{file_name_without_suffix}_{i}.png', result)
+    with open(f'{result_labels_path}/{file_name_without_suffix}_{i}.txt', 'w') as f:
+        for label in new_labels:
+            f.write(f'{label[0]} {label[1]} {label[2]} {label[3]} {label[4]}\n')
+
 # cv2.imwrite(f'{result_path}/mask.png', mask)
 # cv2.imwrite(f'{result_path}/labeled_patch_img.png', labeled_patch_img)
 # cv2.imwrite(f'{result_path}/perspective_transformed_img.png', perspective_transformed_img)

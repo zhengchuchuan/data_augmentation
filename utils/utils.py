@@ -58,3 +58,23 @@ def generate_random_transform_matrix(image_shape, scale_range=(0.8, 1.2), rotati
     transform_matrix = scale_matrix @ rotation_matrix @ translation_matrix @ shear_matrix
 
     return transform_matrix
+
+def rectangle_union(rect1, rect2):
+    # rect1 and rect2 are tuples of tuples representing rectangles:
+    # rect1 = ((x1_1, y1_1), (x1_2, y1_2))
+    # rect2 = ((x2_1, y2_1), (x2_2, y2_2))
+
+    # Extract coordinates from rectangles
+    x1_1, y1_1 = rect1[0]
+    x1_2, y1_2 = rect1[1]
+    x2_1, y2_1 = rect2[0]
+    x2_2, y2_2 = rect2[1]
+
+    # Calculate union rectangle coordinates
+    xmin = min(x1_1, x1_2, x2_1, x2_2)
+    ymin = min(y1_1, y1_2, y2_1, y2_2)
+    xmax = max(x1_1, x1_2, x2_1, x2_2)
+    ymax = max(y1_1, y1_2, y2_1, y2_2)
+
+    # Return union rectangle as a tuple of tuples
+    return ((xmin, ymin), (xmax, ymax))
