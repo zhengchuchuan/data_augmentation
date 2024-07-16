@@ -8,44 +8,54 @@ from tqdm import tqdm
 
 from utils.utils import generate_random_transform_matrix
 from utils.transforms import elastic_transform, perspective_transform
-from utils.data_process import center_bbox_to_corner_bbox, random_sub_label
-from utils.file_io import read_yolo_labels, read_labelme_json
+from utils.data_process import center_bbox_to_corner_bbox, random_sub_label, labelme_json_to_bbox
+from utils.file_io import read_yolo_labels,read_labelme_json
 
-jpg_path = None
-label_path = r'C:\Users\zcc\project\wayho\oil_detection\oil_identification\image_expansion\data\labels\MAX_20240608_MAX_0001_Color_D.txt'
-jpg_path = label_path.replace('labels', 'imgs').replace('.txt', '.png')
-result_path = 'experiment/copy'
 
-file_name = os.path.basename(jpg_path)
-file_name_no_ext = os.path.splitext(file_name)[0]
+
+
+
+
+img_path = None
+label_path = r'D:\Project\python_project\data_augmentation\data\data\labels\MAX_20240516_MAX_0004_Color_D.json'
+result_path = 'experiment'
+
+label_name = os.path.basename(label_path)
+file_name_without_suffix, label_suffix = os.path.splitext(label_name)
+img_path = label_path.replace('labels', 'imgs').replace(label_suffix, '.png')
+if not os.path.exists(img_path):
+    img_path = img_path.replace('.png', '.jpg')
+if not os.path.exists(img_path):
+    raise ValueError(f'图像文件不存在：{img_path}')
+
+
 if not os.path.exists(result_path):
     os.makedirs(result_path)
 
 # 读取图像
-jpg = cv2.imread(jpg_path)
-jpg_height, jpg_weight, _ = jpg.shape
-jpg_center = (jpg_weight // 2, jpg_height // 2)
+img = cv2.imread(img_path)
+img_height, img_weight, _ = img.shape
+img_center = (img_weight // 2, img_height // 2)
 # 读取标签
-suffix = os.path.splitext(label_path)[1]
-if suffix == '.txt':
+if label_suffix == '.txt':
     yolo_labels = read_yolo_labels(label_path)
-    bbox_labels = center_bbox_to_corner_bbox(yolo_labels, jpg_height, jpg_weight)
-elif suffix == '.json':
+    bbox_labels = center_bbox_to_corner_bbox(yolo_labels, img_height, img_weight)
+elif label_suffix == '.json':
     bbox_labels = read_labelme_json(label_path)
     bbox_labels = labelme_json_to_bbox(bbox_labels)
 
 cut_imgs = []
 
-random_times = 200
+random_times = 20
 for i in tqdm(range(random_times)):
-    result = jpg
+    result = img
     for _, bbox_label in enumerate(bbox_labels):
         class_id, x1, y1, x2, y2 = bbox_label
         width = x2 - x1
         height = y2 - y1
         label_center = ((x1 + x2) // 2, (y1 + y2) // 2)
 
-        labeled_patch_img = jpg[y1:y2, x1:x2, :]
+        labeled_patch_img = img[y1:y2, x1:x2, :]
 
         # 弹性变换
         elastic_transformed_img = elastic_transform(labeled_patch_img, alpha=height*0.1, sigma=height*0.02, alpha_affine=height*0.02)
@@ -54,10 +64,11 @@ for i in tqdm(range(random_times)):
                                                             rotation_range=(-10, 10),
                                                             translation_range=(0.1, 0.3), shear_range=(-10, 10))
         # 应用透视变换, 返回变换后的图像、更新后的检测框列表和掩码
+        mask = np.ones(labeled_patch_img.shape, dtype=np.uint8) * 255
 
-        perspective_transformed_img, transformed_bbox,mask = perspective_transform(elastic_transformed_img, bbox_label, transform_matrix)
+        perspective_transformed_img, transformed_bbox, transformed_mask = perspective_transform(elastic_transformed_img, mask, transform_matrix, bbox_label, )
 
-        # mask = np.ones((height, width, 3), dtype=np.uint8) * 255
+
 
         d_rate = 0.2
         dx = np.random.randint(- width*d_rate, width*d_rate)
@@ -67,6 +78,7 @@ for i in tqdm(range(random_times)):
 
         transformed_width = transformed_bbox[3] - transformed_bbox[1]
         transformed_height = transformed_bbox[4] - transformed_bbox[2]
+        ### 待优化
         if random_cneter[0] - transformed_width // 2 < 0 or random_cneter[0] + transformed_height // 2 < 0:
             continue
 
@@ -79,7 +91,10 @@ for i in tqdm(range(random_times)):
         -MONOCHROME_TRANSFER: 不保留src图像的颜色细节，只有src图像的质地，颜色和目标图像一样，可以用来进行皮肤质地填充。
 
         """
-        result = cv2.seamlessClone(perspective_transformed_img, result, mask, random_cneter, cv2.MIXED_CLONE)
+        result = cv2.seamlessClone(perspective_transformed_img, result, transformed_mask, random_cneter, cv2.MIXED_CLONE)
 
-    cv2.imwrite(f'{result_path}/{file_name_no_ext}_{i}.png', result)
+    cv2.imwrite(f'{result_path}/{file_name_without_suffix}_{i}.png', result)
+# cv2.imwrite(f'{result_path}/mask.png', mask)
+# cv2.imwrite(f'{result_path}/labeled_patch_img.png', labeled_patch_img)
+# cv2.imwrite(f'{result_path}/perspective_transformed_img.png', perspective_transformed_img)
 

@@ -46,15 +46,8 @@ def elastic_transform(image, alpha, sigma, alpha_affine, random_state=None):
 
     return transformed_image
 
-def perspective_transform(image, bbox, M):
-    """
-    对图像进行透视变换，并更新检测框标签。
+def perspective_transform(image, mask, M, bbox):
 
-    :param image: 输入图像
-    :param bbox: 检测框，[classid, x1, y1, x2, y2]
-    :param M: 透视变换矩阵，3x3
-    :return: 变换后的图像、更新后的检测框列表和掩码
-    """
     # 获取图像尺寸
     h, w = image.shape[:2]
 
@@ -80,9 +73,10 @@ def perspective_transform(image, bbox, M):
     transformed_image = cv2.warpPerspective(image, M, (new_w, new_h))
 
     # 生成掩码
-    mask = np.ones((h, w), dtype=np.uint8)
-    mask = cv2.warpPerspective(mask, M, (new_w, new_h))
-    mask = (mask > 0).astype(np.uint8) * 255  # 将掩码转换为0和255的二值图像
+    # mask = np.ones((h, w), dtype=np.uint8)
+    # mask = (mask > 0).astype(np.uint8) * 255
+    trans_mask = cv2.warpPerspective(mask, M, (new_w, new_h))
+ # 将掩码转换为0和255的二值图像
 
     # 更新检测框
     classid, x1, y1, x2, y2 = bbox
@@ -97,4 +91,4 @@ def perspective_transform(image, bbox, M):
     new_x2, new_y2 = np.max(transformed_points, axis=0)
     transformed_boxe = (classid, int(new_x1), int(new_y1), int(new_x2), int(new_y2))
 
-    return transformed_image, transformed_boxe, mask
+    return transformed_image, transformed_boxe, trans_mask
