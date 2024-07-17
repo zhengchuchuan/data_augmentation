@@ -1,0 +1,13 @@
+C:\Users\zcc\project\wayho\oil_detection\data_augmentation\data\labels\20240712_01_001.txt
+C:\Users\zcc\project\wayho\oil_detection\data_augmentation\data\labels\20240712_01_002.txt
+C:\Users\zcc\project\wayho\oil_detection\data_augmentation\data\labels\20240712_03_001.txt
+C:\Users\zcc\project\wayho\oil_detection\data_augmentation\data\labels\20240712_03_002.txt
+C:\Users\zcc\project\wayho\oil_detection\data_augmentation\data\labels\20240712_04_001.txt
+C:\Users\zcc\project\wayho\oil_detection\data_augmentation\data\labels\20240712_04_002.txt
+C:\Users\zcc\project\wayho\oil_detection\data_augmentation\data\labels\20240712_04_003.txt
+C:\Users\zcc\project\wayho\oil_detection\data_augmentation\data\labels\20240712_06_001.txt
+C:\Users\zcc\project\wayho\oil_detection\data_augmentation\data\labels\20240712_06_002.txt
+C:\Users\zcc\project\wayho\oil_detection\data_augmentation\data\labels\20240712_06_003.txt
+C:\Users\zcc\project\wayho\oil_detection\data_augmentation\data\labels\MAX_20240516_MAX_0188_Color_D.txt
+C:\Users\zcc\project\wayho\oil_detection\data_augmentation\data\labels\MAX_20240519_MAX_0076_Color_D.txt
+C:\Users\zcc\project\wayho\oil_detection\data_augmentation\data\labels\MAX_20240608_MAX_0001_Color_D.txt

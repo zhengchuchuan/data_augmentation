@@ -8,5 +8,6 @@ out
 gen
 
 
-data/*
+data/imgs/*
+data/labels/*
 exp/*
