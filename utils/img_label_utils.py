@@ -75,3 +75,22 @@ def yolo_to_labelme_json(yolo_data, class_names, img_shape, version='4.5.6'):
         labelme_data["shapes"].append(shape)
 
     return labelme_data
+
+def labelme_json_to_bbox(labelme_annotations):
+    bbox_annotations = []
+    for annotation in labelme_annotations:
+        label = annotation['label']
+        points = annotation['points']
+
+        # Calculate bbox from points (assuming points are in [x, y] format)
+        x_coords = [point[0] for point in points]
+        y_coords = [point[1] for point in points]
+        xmin = int(min(x_coords))
+        xmax = int(max(x_coords))
+        ymin = int(min(y_coords))
+        ymax = int(max(y_coords))
+
+        # Append the bbox as a tuple
+        bbox_annotations.append((label, xmin, ymin, xmax, ymax))
+
+    return bbox_annotations

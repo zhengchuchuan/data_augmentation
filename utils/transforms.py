@@ -79,7 +79,7 @@ def perspective_transform(image, mask, M, bbox):
  # 将掩码转换为0和255的二值图像
 
     # 更新检测框
-    classid, x1, y1, x2, y2 = bbox
+    x1, y1, x2, y2 = bbox
     # 定义检测框的四个顶点
     points = np.array([[x1, y1, 1], [x2, y1, 1], [x2, y2, 1], [x1, y2, 1]], dtype=np.float32)
     # 变换检测框顶点
@@ -89,6 +89,6 @@ def perspective_transform(image, mask, M, bbox):
     # 获取新的检测框的边界
     new_x1, new_y1 = np.min(transformed_points, axis=0)
     new_x2, new_y2 = np.max(transformed_points, axis=0)
-    transformed_boxe = (classid, int(new_x1), int(new_y1), int(new_x2), int(new_y2))
+    transformed_boxe = (new_x1, new_y1, new_x2, new_y2)
 
     return transformed_image, transformed_boxe, trans_mask

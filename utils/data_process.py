@@ -214,21 +214,17 @@ def random_sub_label(bbox_label, width_ratio, height_ratio):
 
     return sub_bbox_label
 
-def labelme_json_to_bbox(labelme_annotations):
-    bbox_annotations = []
-    for annotation in labelme_annotations:
-        label = annotation['label']
-        points = annotation['points']
+def xywh_rect_to_x1y1x2y2(xywh_rect):
+    """
+    将 (x, y, w, h) 格式的矩形坐标转换为 (x1, y1, x2, y2) 格式的坐标。
 
-        # Calculate bbox from points (assuming points are in [x, y] format)
-        x_coords = [point[0] for point in points]
-        y_coords = [point[1] for point in points]
-        xmin = int(min(x_coords))
-        xmax = int(max(x_coords))
-        ymin = int(min(y_coords))
-        ymax = int(max(y_coords))
+    :param xywh_rect: (x, y, w, h) 格式的矩形坐标
+    :return: (x1, y1, x2, y2) 格式的矩形坐标
+    """
+    x, y, w, h = xywh_rect
+    x1 = x
+    y1 = y
+    x2 = x + w
+    y2 = y + h
 
-        # Append the bbox as a tuple
-        bbox_annotations.append((label, xmin, ymin, xmax, ymax))
-
-    return bbox_annotations
+    return (x1, y1, x2, y2)
