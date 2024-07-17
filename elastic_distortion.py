@@ -10,7 +10,7 @@ from utils.utils import generate_random_transform_matrix, rectangle_union
 from utils.transforms import elastic_transform, perspective_transform
 from utils.data_process import center_bbox_to_corner_bbox, xywh_rect_to_x1y1x2y2
 from utils.file_io import make_sure_paths_exist, read_lines_to_list
-from utils.img_label_utils import read_yolo_labels, read_labelme_json, yolo_to_labelme_json
+from utils.img_label_utils import read_yolo_labels, read_labelme_json, yolo_to_labelme_json, save_labelme_json
 
 img_path = None
 label_path_list = r'data/data_list/label_list_0717.txt'
@@ -71,8 +71,11 @@ for label_path in label_paths:
                 raise ValueError(f'标签点数小于2{label_path}')
             label_width = xywh_rect[2]
             label_height = xywh_rect[3]
-            x1y1x2y2_rect = xywh_rect_to_x1y1x2y2(xywh_rect)
-            x1, y1, x2, y2 = x1y1x2y2_rect
+            rect_points = xywh_rect_to_x1y1x2y2(xywh_rect)
+            x1 = rect_points[0][0]
+            y1 = rect_points[0][1]
+            x2 = rect_points[1][0]
+            y2 = rect_points[1][1]
             label_center = (x1 + (x2 - x1) // 2, y1 + (y2 - y1) // 2)
 
             labeled_patch_img = img[y1:y2, x1:x2, :]
@@ -85,18 +88,24 @@ for label_path in label_paths:
             # 应用透视变换, 返回变换后的图像、更新后的检测框列表和掩码
             mask = np.ones(labeled_patch_img.shape, dtype=np.uint8) * 255
 
-            perspective_transformed_img, transformed_bbox, transformed_mask = perspective_transform(elastic_transformed_img, mask, transform_matrix, x1y1x2y2_rect )
+            perspective_transformed_img, transformed_labels, transformed_mask = perspective_transform(elastic_transformed_img, mask, transform_matrix, rect_points )
 
 
-            trans_x1, trans_y1, trans_x2, trans_y2 = transformed_bbox
+            trans_x1 = transformed_labels[0][0]
+            trans_y1 = transformed_labels[0][1]
+            trans_x2 = transformed_labels[1][0]
+            trans_y2 = transformed_labels[1][1]
+
+            transformed_width = trans_x2 - trans_x1
+            transformed_height = trans_y2 - trans_y1
+
             d_rate = 0.2
             dx = np.random.randint(- label_width*d_rate, label_width*d_rate)
             dy = np.random.randint(- label_height*d_rate, label_height*d_rate)
             random_cneter = (label_center[0] + dx,
                              label_center[1] + dy)
 
-            transformed_width = transformed_bbox[2] - transformed_bbox[0]
-            transformed_height = transformed_bbox[3] - transformed_bbox[1]
+
             ### 待优化
             if random_cneter[0] - transformed_width // 2 < 0 or random_cneter[0] + transformed_height // 2 < 0:
                 continue
@@ -120,9 +129,7 @@ for label_path in label_paths:
 
         cv2.imwrite(f'{result_imgs_path}/{file_name_without_suffix}_{i}.png', result)
 
-        with open(f'{result_labels_path}/{file_name_without_suffix}_{i}.txt', 'w') as f:
-            for label in new_labels:
-                f.write(f'{label[0]} {label[1]} {label[2]} {label[3]} {label[4]}\n')
+        save_labelme_json(labelme_data, f'{result_labels_path}/{file_name_without_suffix}_{i}.json')
 
     cv2.imwrite(f'{result_imgs_path}/mask.png', transformed_mask)
     cv2.imwrite(f'{result_imgs_path}/labeled_patch_img.png', labeled_patch_img)

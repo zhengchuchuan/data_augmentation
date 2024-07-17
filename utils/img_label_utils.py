@@ -27,6 +27,10 @@ def read_labelme_json(json_file):
     return data
 
 
+def save_labelme_json(json_data, file_path):
+    with open(file_path, 'w') as f:
+        json.dump(json_data, f, indent=4, ensure_ascii=False)
+
 def yolo_to_labelme_json(yolo_data, class_names, img_shape, version='4.5.6'):
     """
     将 YOLO 格式的标注数据转换为 LabelMe 格式的数据

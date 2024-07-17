@@ -227,4 +227,4 @@ def xywh_rect_to_x1y1x2y2(xywh_rect):
     x2 = x + w
     y2 = y + h
 
-    return (x1, y1, x2, y2)
+    return ((x1, y1), (x2, y2))

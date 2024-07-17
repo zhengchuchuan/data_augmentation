@@ -15,7 +15,7 @@ from utils.file_io import read_yolo_labels
 jpg_path = None
 label_path = r'C:\Users\zcc\project\wayho\oil_detection\oil_identification\image_expansion\data\labels\MAX_20240519_MAX_0076_Color_D.txt'
 jpg_path = label_path.replace('labels', 'imgs').replace('.txt', '.png')
-result_path = 'experiment/copy'
+result_path = 'exp/copy'
 
 file_name = os.path.basename(jpg_path)
 file_name_no_ext = os.path.splitext(file_name)[0]

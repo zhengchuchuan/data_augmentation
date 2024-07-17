@@ -30,16 +30,16 @@ def get_data_path(file_paths, suffix=None, prefix=None, file_name_pattern=None):
 
     return filename_list
 
-data_dirs = [r'C:\Users\zcc\project\wayho\oil_detection\data_augmentation\data\labels', ]
+data_dirs = [r'labels', ]
 save_dir = "data_list"
 
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
 
 
-# prefix = 'data'
-prefix = None
-suffix = '.txt'
+prefix = 'data'
+# prefix = None
+suffix = '.json'
 file_name_pattern = '*'
 
 
