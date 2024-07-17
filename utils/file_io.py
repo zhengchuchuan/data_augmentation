@@ -1,42 +1,21 @@
+import errno
 import json
+import os
 
 
-def read_yolo_labels(file_path):
-    labels = []
-    with open(file_path, 'r',encoding='utf-8') as file:
-        lines = file.readlines()
-        for line in lines:
-            parts = line.strip().split()
-            # 检查行的长度是否符合预期
-            if len(parts) != 5:
-                continue  # 跳过无效行
-            class_id = int(parts[0])
-            x_center = float(parts[1])
-            y_center = float(parts[2])
-            width = float(parts[3])
-            height = float(parts[4])
-            labels.append((class_id, x_center, y_center, width, height))
-    return labels
+def make_sure_paths_exist(*paths):
+    """
+    检查多个路径是否存在，如果不存在则创建
+    :param paths:
+    :return:
+    """
+    for path in paths:
+        try:
+            os.makedirs(path, exist_ok=True)
+        except OSError as exception:
+            if exception.errno != errno.EEXIST:
+                raise
 
-
-# 读取VOC标签文件
-def read_labelme_json(json_file):
-    with open(json_file, 'r') as f:
-        data = json.load(f)
-
-    annotations = []
-    for shape in data['shapes']:
-        label = shape['label']
-        points = shape['points']
-        group_id = shape.get('group_id', None)  # Optional, if group_id exists
-
-        annotations.append({
-            'label': label,
-            'points': points,
-            'group_id': group_id
-        })
-
-    return annotations
 
 def read_bbox_labels(file_path):
     """
@@ -77,7 +56,7 @@ def read_lines_to_list(file_path):
     lines = []
     with open(file_path, 'r') as file:
         for line in file:
-            lines.append(line.strip())  # 去除每行末尾的换行符并加入到列表中
+            lines.append(line.strip())  # 去除每行头尾的空字符并加入到列表中
     return lines
 
 
