@@ -22,7 +22,7 @@ def read_labelme_json(json_file):
     with open(json_file, 'r') as f:
         data = json.load(f)
 
-    data['imageData'] = None
+    # data['imageData'] = None
 
     return data
 

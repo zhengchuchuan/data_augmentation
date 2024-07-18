@@ -54,16 +54,17 @@ for label_path in label_paths:
     labelme_labels = labelme_data['shapes']
 
 
-    new_labels = []
+
 
     random_times = 20
     for i in tqdm(range(random_times)):
         result = img
+        new_shaps = []
         for _, label in enumerate(labelme_labels):
             class_name = label['label']
             points = label['points']
 
-            points = np.array(points,dtype=np.float32)
+            points = np.array(points,dtype=np.int32)
             if len(points) > 1:
             # 两个点也会判断成矩形
                 xywh_rect = cv2.boundingRect(points)
@@ -80,13 +81,15 @@ for label_path in label_paths:
 
             labeled_patch_img = img[y1:y2, x1:x2, :]
             # 弹性变换
-            elastic_transformed_img = elastic_transform(labeled_patch_img, alpha=label_height*0.2, sigma=label_height*0.02, alpha_affine=label_height*0.02)
+            elastic_transformed_img = elastic_transform(labeled_patch_img, alpha=label_height*0.1, sigma=label_height*0.02, alpha_affine=label_height*0.02)
             # 生成随机变换矩阵
             transform_matrix = generate_random_transform_matrix(elastic_transformed_img.shape, scale_range=(0.8, 1.2),
                                                                 rotation_range=(-10, 10),
                                                                 translation_range=(0.1, 0.3), shear_range=(-10, 10))
             # 应用透视变换, 返回变换后的图像、更新后的检测框列表和掩码
-            mask = np.ones(labeled_patch_img.shape, dtype=np.uint8) * 255
+            mask = np.zeros(labeled_patch_img.shape, dtype=np.uint8)
+            relative_points = points - np.array([x1, y1])
+            cv2.fillPoly(mask, [relative_points], (255,255,255))
 
             perspective_transformed_img, transformed_labels, transformed_mask = perspective_transform(elastic_transformed_img, mask, transform_matrix, rect_points )
 
@@ -122,13 +125,19 @@ for label_path in label_paths:
             rect1 = ((x1, y1), (x2, y2))
             rect2 = ((trans_x1,trans_y1),(trans_x2,trans_y2))
             new_rect = rectangle_union(rect1, rect2)
-            new_label = (label, new_rect[0][0], new_rect[0][1], new_rect[1][0], new_rect[1][1])
-            new_labels.append(new_label)
 
+            new_points = {
+                'label': class_name,
+                'points': [(int(new_rect[0][0]), int(new_rect[0][1])), (int(new_rect[1][0]), int(new_rect[1][1]))],
+                'shape_type': 'rectangle'
+            }
+            new_shaps.append(new_points)
+            # 更新标签未完善
             result = cv2.seamlessClone(perspective_transformed_img, result, transformed_mask, random_cneter, cv2.MIXED_CLONE)
 
         cv2.imwrite(f'{result_imgs_path}/{file_name_without_suffix}_{i}.png', result)
 
+        labelme_data['shapes'] = new_shaps
         save_labelme_json(labelme_data, f'{result_labels_path}/{file_name_without_suffix}_{i}.json')
 
     cv2.imwrite(f'{result_imgs_path}/mask.png', transformed_mask)

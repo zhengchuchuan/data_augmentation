@@ -4,7 +4,7 @@ import os
 
 
 
-def get_data_path(file_paths, suffix=None, prefix=None, file_name_pattern=None):
+def get_data_path(file_paths, suffixes=None, prefix=None, file_name_pattern=None):
     filename_list = []
 
     # 每个文件夹路径
@@ -17,7 +17,8 @@ def get_data_path(file_paths, suffix=None, prefix=None, file_name_pattern=None):
             # 处理指定的子文件夹
             if root_dir == 'labels':
                 # 获取文件路径列表
-                dir_paths = glob.glob(fr"{root}/{file_name_pattern}{suffix}")
+                for suffix in suffixes:
+                    dir_paths.extend(glob.glob(fr"{root}/{file_name_pattern}{suffix}"))
 
                 # 仅获取带后缀的文件名,并排除文件名为'classes.txt'的路径
                 dir_paths = [path for path in dir_paths if not path.endswith('classes.txt')]
@@ -39,11 +40,11 @@ if not os.path.exists(save_dir):
 
 prefix = 'data'
 # prefix = None
-suffix = '.json'
+suffixes = ['.json', '.txt']
 file_name_pattern = '*'
 
 
-label_list = get_data_path(file_paths=data_dirs, suffix=suffix, prefix=prefix, file_name_pattern=file_name_pattern)
+label_list = get_data_path(file_paths=data_dirs, suffixes=suffixes, prefix=prefix, file_name_pattern=file_name_pattern)
 
 description = '0717'
 
