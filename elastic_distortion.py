@@ -4,6 +4,8 @@ import random
 import cv2
 import numpy as np
 from tqdm import tqdm
+from shapely.geometry import Polygon
+from shapely.ops import unary_union
 
 from utils.utils import generate_random_transform_matrix, rectangle_union
 from utils.transforms import elastic_transform, perspective_transform
@@ -28,7 +30,6 @@ for label_path in label_paths:
     if not os.path.exists(label_path):
         raise ValueError(f'标签文件不存在：{label_path}')
 
-
     label_name = os.path.basename(label_path)
     file_name_without_suffix, label_suffix = os.path.splitext(label_name)
     image_extensions = ['.png', '.jpg', '.jpeg', '.bmp']
@@ -41,7 +42,6 @@ for label_path in label_paths:
 
     if not os.path.exists(img_path):
         raise ValueError(f'图像文件不存在：{img_path}')
-
 
     # 读取图像
     img = cv2.imread(img_path)
@@ -56,12 +56,9 @@ for label_path in label_paths:
 
     labelme_labels = labelme_data['shapes']
 
-
-
-
     generate_nums = 20
     random_times = 3
-    
+
     for i in tqdm(range(generate_nums)):
         augmented_img = img
 
@@ -70,77 +67,67 @@ for label_path in label_paths:
         for j, label in enumerate(labelme_labels):
             status = True
             class_name = label['label']
-            points = label['points']
+            label_points = label['points']
 
-            points = np.array(points,dtype=np.int32)
-            if len(points) > 1:
-            # 两个点也会判断成矩形
-                xywh_rect = cv2.boundingRect(points)
+            label_points = np.array(label_points, dtype=np.int32)
+            if len(label_points) > 1:
+                # 两个点也会判断成矩形
+                xywh_rect = cv2.boundingRect(label_points)
             else:
                 raise ValueError(f'标签点数小于2{label_path}')
             label_width = xywh_rect[2]
             label_height = xywh_rect[3]
-            rect_points = xywh_rect_to_x1y1x2y2(xywh_rect)
-            x1 = rect_points[0][0]
-            y1 = rect_points[0][1]
-            x2 = rect_points[1][0]
-            y2 = rect_points[1][1]
+            rect_label_points = xywh_rect_to_x1y1x2y2(xywh_rect)
+            # 获取标签区域的左上角和右下角坐标
+            x1 = rect_label_points[0][0]
+            y1 = rect_label_points[0][1]
+            x2 = rect_label_points[1][0]
+            y2 = rect_label_points[1][1]
             label_center = (x1 + label_width // 2, y1 + label_height // 2)
             # 标签区域
             labeled_img = img[y1:y2, x1:x2, :]
-
+            # 对一个标签进行多次随机变换
             for k in range(random_times):
 
                 # 标签区域的掩码
-                # mask = np.zeros(labeled_img.shape, dtype=np.uint8)
-                # relative_points = points - np.array([x1, y1])
-                # cv2.fillPoly(mask, [relative_points], (255,255,255))
-
-                mask = np.ones(labeled_img.shape, dtype=np.uint8) * 255
-
-
+                mask = np.zeros(labeled_img.shape, dtype=np.uint8)
+                if len(label_points) >= 3:
+                    relative_label_points = label_points - np.array([x1, y1])
+                    cv2.fillPoly(mask, [relative_label_points], (255, 255, 255))
+                else:
+                    cv2.fillrect(mask, label_points, (255, 255, 255))
+                # mask = np.ones(labeled_img.shape, dtype=np.uint8) * 255
 
                 # 弹性变换
-                elastic_transformed_img = elastic_transform(labeled_img, alpha=label_height*0.1, sigma=label_height*0.02, alpha_affine=label_height*0.02)
+                elastic_transformed_img = elastic_transform(labeled_img, alpha=label_height * 0.1,
+                                                            sigma=label_height * 0.02, alpha_affine=label_height * 0.02)
 
                 # 生成随机透视变换矩阵
-                transform_matrix = generate_random_transform_matrix(elastic_transformed_img.shape, scale_range=(0.8, 1.2),
+                transform_matrix = generate_random_transform_matrix(elastic_transformed_img.shape,
+                                                                    scale_range=(0.8, 1.2),
                                                                     rotation_range=(-15, 15),
-                                                                    translation_range=(0.1, 0.3), shear_range=(-10, 10))
+                                                                    translation_range=(0.1, 0.3),
+                                                                    shear_range=(-10, 10))
                 # 应用透视变换, 返回变换后的图像、更新后的检测框列表和掩码
-                perspective_transformed_img, transformed_labels, transformed_mask = perspective_transform(elastic_transformed_img, mask, transform_matrix, rect_points )
+                perspective_transformed_img, transformed_mask, transformed_label_points = perspective_transform(
+                    elastic_transformed_img, mask, transform_matrix, relative_label_points)
 
-                trans_x1 = transformed_labels[0][0]
-                trans_y1 = transformed_labels[0][1]
-                trans_x2 = transformed_labels[1][0]
-                trans_y2 = transformed_labels[1][1]
-
-                transformed_width = trans_x2 - trans_x1
-                transformed_height = trans_y2 - trans_y1
-
-                d_rate = 0.2
-                dx = np.random.randint(- label_width*d_rate, label_width*d_rate)
-                dy = np.random.randint(- label_height*d_rate, label_height*d_rate)
+                transformed_label_points = transformed_label_points + np.array([x1, y1])
+                dx = np.random.randint(-10 ,10 )
+                dy = np.random.randint(- 10, 10)
                 random_cneter = (label_center[0] + dx,
                                  label_center[1] + dy)
 
-
                 ### 待优化
-                if random_cneter[0] - transformed_width // 2 < 0 or random_cneter[0] + transformed_height // 2 > img_weight:
-                    status = False
-                    continue
-
-                if random_cneter[1] - transformed_height // 2 < 0 or random_cneter[1] + transformed_height // 2 > img_height:
-                    status = False
-                    continue
-
-                ### 待优化
-                # if trans_x1 + dx  < 0 or trans_x1 + dx > label_width:
+                # if random_cneter[0] - transformed_width // 2 < 0 or random_cneter[
+                #     0] + transformed_height // 2 > img_weight:
+                #     status = False
                 #     continue
                 #
-                # if trans_y1 +dy < 0 or trans_y2 + dy > label_height:
+                # if random_cneter[1] - transformed_height // 2 < 0 or random_cneter[
+                #     1] + transformed_height // 2 > img_height:
+                #     status = False
                 #     continue
-
 
 
                 # 更新标签未完善
@@ -150,25 +137,34 @@ for label_path in label_paths:
                 -MONOCHROME_TRANSFER: 不保留src图像的颜色细节，只有src图像的质地，颜色和目标图像一样，可以用来进行皮肤质地填充。
     
                 """
-            augmented_img = cv2.seamlessClone(perspective_transformed_img, augmented_img, transformed_mask, random_cneter, cv2.MIXED_CLONE)
+            augmented_img = cv2.seamlessClone(perspective_transformed_img, augmented_img, transformed_mask,
+                                              random_cneter, cv2.NORMAL_CLONE)
 
-        if status:
-            rect1 = ((x1, y1), (x2, y2))
-            rect2 = ((trans_x1, trans_y1), (trans_x2, trans_y2))
-            new_rect = rectangle_union(rect1, rect2)
+            if status:
+                # 定义两个多边形的顶点坐标
+                polygon1 = Polygon(label_points)
+                polygon2 = Polygon(transformed_label_points)
+                # 计算多边形的并集
+                union_polygon = unary_union([polygon1, polygon2])
 
-            new_points = {
-                'label': class_name,
-                'points': [(int(new_rect[0][0]), int(new_rect[0][1])), (int(new_rect[1][0]), int(new_rect[1][1]))],
-                'shape_type': 'rectangle'
-            }
-            new_shaps.append(new_points)
+                # 获取并集多边形的顶点坐标
+                union_coords = list(union_polygon.exterior.coords)
+                label_points = np.array(union_coords[:-1], dtype=np.float32)
+
+                new_shapes = {
+                    'label': class_name,
+                    'points': label_points.tolist(),
+                    'shape_type': 'polygon'
+                }
+                new_shaps.append(new_shapes)
+
 
             cv2.imwrite(f'{result_imgs_path}/{file_name_without_suffix}_{i}.png', augmented_img)
+            labelme_data['version'] = '5.2.0'
             labelme_data['shapes'] = new_shaps
+
             save_labelme_json(labelme_data, f'{result_labels_path}/{file_name_without_suffix}_{i}.json')
 
 cv2.imwrite(f'{result_imgs_path}/mask.png', transformed_mask)
 cv2.imwrite(f'{result_imgs_path}/labeled_img.png', labeled_img)
 cv2.imwrite(f'{result_imgs_path}/perspective_transformed_img.png', perspective_transformed_img)
-
