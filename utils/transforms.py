@@ -14,6 +14,7 @@ def elastic_transform(image, alpha, sigma, alpha_affine, random_state=None):
     :param random_state: 随机数生成器的种子，默认为 None
     :return: 变形后的图像
     """
+    # 设置随机数生成器
     if random_state is None:
         random_state = np.random.RandomState(None)
 
@@ -23,11 +24,15 @@ def elastic_transform(image, alpha, sigma, alpha_affine, random_state=None):
     # Random affine
     center_square = np.float32(shape_size) // 2
     square_size = min(shape_size) // 3
+    # 非共线的三对对应点确定一个唯一的仿射变换
     pts1 = np.float32([center_square + square_size,
                        [center_square[0] + square_size, center_square[1] - square_size],
                        center_square - square_size])
+
     pts2 = pts1 + random_state.uniform(-alpha_affine, alpha_affine, size=pts1.shape).astype(np.float32)
+    # 计算仿射变换矩阵
     M = cv2.getAffineTransform(pts1, pts2)
+    # 应用仿射变换
     imageB = cv2.warpAffine(image, M, shape_size[::-1], borderMode=cv2.BORDER_REFLECT_101)
 
     # Generate random displacement fields

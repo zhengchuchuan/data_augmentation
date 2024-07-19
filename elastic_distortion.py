@@ -3,12 +3,11 @@ import random
 
 import cv2
 import numpy as np
-from scipy.ndimage import gaussian_filter, map_coordinates
 from tqdm import tqdm
 
 from utils.utils import generate_random_transform_matrix, rectangle_union
 from utils.transforms import elastic_transform, perspective_transform
-from utils.data_process import center_bbox_to_corner_bbox, xywh_rect_to_x1y1x2y2
+from utils.data_process import xywh_rect_to_x1y1x2y2
 from utils.file_io import make_sure_paths_exist, read_lines_to_list
 from utils.img_label_utils import read_yolo_labels, read_labelme_json, yolo_to_labelme_json, save_labelme_json
 
@@ -32,12 +31,16 @@ for label_path in label_paths:
 
     label_name = os.path.basename(label_path)
     file_name_without_suffix, label_suffix = os.path.splitext(label_name)
-    img_path = label_path.replace('labels', 'imgs').replace(label_suffix, '.png')
-    if not os.path.exists(img_path):
-        img_path = img_path.replace('.png', '.jpg')
+    image_extensions = ['.png', '.jpg', '.jpeg', '.bmp']
+    img_dir = os.path.dirname(label_path).replace('labels', 'imgs')
+
+    for ext in image_extensions:
+        img_path_temp = os.path.join(img_dir, file_name_without_suffix + ext)
+        if os.path.exists(img_path_temp):
+            img_path = img_path_temp
+
     if not os.path.exists(img_path):
         raise ValueError(f'图像文件不存在：{img_path}')
-
 
 
     # 读取图像
@@ -56,11 +59,16 @@ for label_path in label_paths:
 
 
 
-    random_times = 20
-    for i in tqdm(range(random_times)):
-        result = img
+    generate_nums = 20
+    random_times = 3
+    
+    for i in tqdm(range(generate_nums)):
+        augmented_img = img
+
         new_shaps = []
-        for _, label in enumerate(labelme_labels):
+        status = None
+        for j, label in enumerate(labelme_labels):
+            status = True
             class_name = label['label']
             points = label['points']
 
@@ -77,53 +85,76 @@ for label_path in label_paths:
             y1 = rect_points[0][1]
             x2 = rect_points[1][0]
             y2 = rect_points[1][1]
-            label_center = (x1 + (x2 - x1) // 2, y1 + (y2 - y1) // 2)
+            label_center = (x1 + label_width // 2, y1 + label_height // 2)
+            # 标签区域
+            labeled_img = img[y1:y2, x1:x2, :]
 
-            labeled_patch_img = img[y1:y2, x1:x2, :]
-            # 弹性变换
-            elastic_transformed_img = elastic_transform(labeled_patch_img, alpha=label_height*0.1, sigma=label_height*0.02, alpha_affine=label_height*0.02)
-            # 生成随机变换矩阵
-            transform_matrix = generate_random_transform_matrix(elastic_transformed_img.shape, scale_range=(0.8, 1.2),
-                                                                rotation_range=(-10, 10),
-                                                                translation_range=(0.1, 0.3), shear_range=(-10, 10))
-            # 应用透视变换, 返回变换后的图像、更新后的检测框列表和掩码
-            mask = np.zeros(labeled_patch_img.shape, dtype=np.uint8)
-            relative_points = points - np.array([x1, y1])
-            cv2.fillPoly(mask, [relative_points], (255,255,255))
+            for k in range(random_times):
 
-            perspective_transformed_img, transformed_labels, transformed_mask = perspective_transform(elastic_transformed_img, mask, transform_matrix, rect_points )
+                # 标签区域的掩码
+                # mask = np.zeros(labeled_img.shape, dtype=np.uint8)
+                # relative_points = points - np.array([x1, y1])
+                # cv2.fillPoly(mask, [relative_points], (255,255,255))
+
+                mask = np.ones(labeled_img.shape, dtype=np.uint8) * 255
 
 
-            trans_x1 = transformed_labels[0][0]
-            trans_y1 = transformed_labels[0][1]
-            trans_x2 = transformed_labels[1][0]
-            trans_y2 = transformed_labels[1][1]
 
-            transformed_width = trans_x2 - trans_x1
-            transformed_height = trans_y2 - trans_y1
+                # 弹性变换
+                elastic_transformed_img = elastic_transform(labeled_img, alpha=label_height*0.1, sigma=label_height*0.02, alpha_affine=label_height*0.02)
 
-            d_rate = 0.2
-            dx = np.random.randint(- label_width*d_rate, label_width*d_rate)
-            dy = np.random.randint(- label_height*d_rate, label_height*d_rate)
-            random_cneter = (label_center[0] + dx,
-                             label_center[1] + dy)
+                # 生成随机透视变换矩阵
+                transform_matrix = generate_random_transform_matrix(elastic_transformed_img.shape, scale_range=(0.8, 1.2),
+                                                                    rotation_range=(-15, 15),
+                                                                    translation_range=(0.1, 0.3), shear_range=(-10, 10))
+                # 应用透视变换, 返回变换后的图像、更新后的检测框列表和掩码
+                perspective_transformed_img, transformed_labels, transformed_mask = perspective_transform(elastic_transformed_img, mask, transform_matrix, rect_points )
+
+                trans_x1 = transformed_labels[0][0]
+                trans_y1 = transformed_labels[0][1]
+                trans_x2 = transformed_labels[1][0]
+                trans_y2 = transformed_labels[1][1]
+
+                transformed_width = trans_x2 - trans_x1
+                transformed_height = trans_y2 - trans_y1
+
+                d_rate = 0.2
+                dx = np.random.randint(- label_width*d_rate, label_width*d_rate)
+                dy = np.random.randint(- label_height*d_rate, label_height*d_rate)
+                random_cneter = (label_center[0] + dx,
+                                 label_center[1] + dy)
 
 
-            ### 待优化
-            if random_cneter[0] - transformed_width // 2 < 0 or random_cneter[0] + transformed_height // 2 < 0:
-                continue
+                ### 待优化
+                if random_cneter[0] - transformed_width // 2 < 0 or random_cneter[0] + transformed_height // 2 > img_weight:
+                    status = False
+                    continue
 
-            if random_cneter[1] - transformed_height // 2 < 0 or random_cneter[1] + transformed_height // 2 < 0:
-                continue
+                if random_cneter[1] - transformed_height // 2 < 0 or random_cneter[1] + transformed_height // 2 > img_height:
+                    status = False
+                    continue
 
-            """
-            -NORMAL_CLONE: 不保留dst 图像的texture细节。目标区域的梯度只由源图像决定。
-            -MIXED_CLONE: 保留dest图像的texture 细节。目标区域的梯度是由原图像和目的图像的组合计算出来(计算dominat gradient)。
-            -MONOCHROME_TRANSFER: 不保留src图像的颜色细节，只有src图像的质地，颜色和目标图像一样，可以用来进行皮肤质地填充。
+                ### 待优化
+                # if trans_x1 + dx  < 0 or trans_x1 + dx > label_width:
+                #     continue
+                #
+                # if trans_y1 +dy < 0 or trans_y2 + dy > label_height:
+                #     continue
+
+
+
+                # 更新标签未完善
+                """
+                -NORMAL_CLONE: 不保留dst 图像的texture细节。目标区域的梯度只由源图像决定。
+                -MIXED_CLONE: 保留dest图像的texture 细节。目标区域的梯度是由原图像和目的图像的组合计算出来(计算dominat gradient)。
+                -MONOCHROME_TRANSFER: 不保留src图像的颜色细节，只有src图像的质地，颜色和目标图像一样，可以用来进行皮肤质地填充。
     
-            """
+                """
+            augmented_img = cv2.seamlessClone(perspective_transformed_img, augmented_img, transformed_mask, random_cneter, cv2.MIXED_CLONE)
+
+        if status:
             rect1 = ((x1, y1), (x2, y2))
-            rect2 = ((trans_x1,trans_y1),(trans_x2,trans_y2))
+            rect2 = ((trans_x1, trans_y1), (trans_x2, trans_y2))
             new_rect = rectangle_union(rect1, rect2)
 
             new_points = {
@@ -132,15 +163,12 @@ for label_path in label_paths:
                 'shape_type': 'rectangle'
             }
             new_shaps.append(new_points)
-            # 更新标签未完善
-            result = cv2.seamlessClone(perspective_transformed_img, result, transformed_mask, random_cneter, cv2.MIXED_CLONE)
 
-        cv2.imwrite(f'{result_imgs_path}/{file_name_without_suffix}_{i}.png', result)
+            cv2.imwrite(f'{result_imgs_path}/{file_name_without_suffix}_{i}.png', augmented_img)
+            labelme_data['shapes'] = new_shaps
+            save_labelme_json(labelme_data, f'{result_labels_path}/{file_name_without_suffix}_{i}.json')
 
-        labelme_data['shapes'] = new_shaps
-        save_labelme_json(labelme_data, f'{result_labels_path}/{file_name_without_suffix}_{i}.json')
-
-    cv2.imwrite(f'{result_imgs_path}/mask.png', transformed_mask)
-    cv2.imwrite(f'{result_imgs_path}/labeled_patch_img.png', labeled_patch_img)
-    cv2.imwrite(f'{result_imgs_path}/perspective_transformed_img.png', perspective_transformed_img)
+cv2.imwrite(f'{result_imgs_path}/mask.png', transformed_mask)
+cv2.imwrite(f'{result_imgs_path}/labeled_img.png', labeled_img)
+cv2.imwrite(f'{result_imgs_path}/perspective_transformed_img.png', perspective_transformed_img)
 
