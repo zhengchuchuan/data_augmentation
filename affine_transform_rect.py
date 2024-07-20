@@ -12,7 +12,8 @@ from utils.utils import generate_random_transform_matrix, rectangle_union, valid
 from utils.transforms import elastic_transform, perspective_transform
 from utils.data_process import xywh_rect_to_x1y1x2y2
 from utils.file_io import make_sure_paths_exist, read_lines_to_list
-from utils.img_label_utils import read_yolo_labels, read_labelme_json, yolo_to_labelme_json, save_labelme_json
+from utils.img_label_utils import read_yolo_labels, read_labelme_json, yolo_to_labelme_json, save_labelme_json, \
+    labelme_json_to_yolo, save_yolo_labels
 
 img_path = None
 label_path_list = r'data/data_list/label_list_0717.txt'
@@ -117,19 +118,23 @@ for label_path in label_paths:
                 d_ratio = 0.4
                 dx = np.random.randint(-label_width * d_ratio, label_width * d_ratio)
                 dy = np.random.randint(- label_height * d_ratio, label_height * d_ratio)
+
+
+
                 random_cneter = (label_center[0] + dx,
                                  label_center[1] + dy)
 
+                transformed_label_points_bias = transformed_label_points + np.array([dx, dy])
+
+                transformed_width = transformed_label_points_bias[1][0] - transformed_label_points_bias[0][0]
+                transformed_height = transformed_label_points_bias[1][1] - transformed_label_points_bias[0][1]
+
                 ### 待优化
-                # if random_cneter[0] - transformed_width // 2 < 0 or random_cneter[
-                #     0] + transformed_height // 2 > img_weight:
-                #     status = False
-                #     continue
-                #
-                # if random_cneter[1] - transformed_height // 2 < 0 or random_cneter[
-                #     1] + transformed_height // 2 > img_height:
-                #     status = False
-                #     continue
+                if (transformed_label_points_bias[0][0] < 0 or transformed_label_points_bias[1][0] > img_weight
+                        or transformed_label_points_bias[0][1] < 0 or transformed_label_points_bias[1][1] > img_height):
+                    status = False
+                    continue
+
 
                 # 更新标签未完善
                 """
@@ -138,11 +143,16 @@ for label_path in label_paths:
                 -MONOCHROME_TRANSFER: 不保留src图像的颜色细节，只有src图像的质地，颜色和目标图像一样，可以用来进行皮肤质地填充。
 
                 """
-                augmented_img = cv2.seamlessClone(perspective_transformed_img, augmented_img, transformed_mask,
-                                                  random_cneter, cv2.MIXED_CLONE)
+                try:
+                    augmented_img = cv2.seamlessClone(perspective_transformed_img, augmented_img, transformed_mask,random_cneter, cv2.MIXED_CLONE)
+                except Exception as e:
+                    print(e)
+                    status = False
+                    continue
+
 
                 # 定义两个多边形并检查有效性
-                union_rect = get_bounding_box(rect_label_points, transformed_label_points)
+                union_rect = get_bounding_box(rect_label_points, transformed_label_points_bias)
 
                 # 将结果转换为numpy数组，并移除最后一个重复的点
                 label_points = np.array(union_rect, dtype=np.float32)
@@ -160,8 +170,11 @@ for label_path in label_paths:
             labelme_data['shapes'] = new_shaps
             labelme_data['imagePath'] = f'../imgs/{file_name_without_suffix}_{i}.png'
             labelme_data['imageData'] = None
-
             save_labelme_json(labelme_data, f'{result_labels_path}/{file_name_without_suffix}_{i}.json')
+
+            yolo_data = labelme_json_to_yolo(labelme_data, classes)
+            save_yolo_labels(yolo_data, f'{result_labels_path}/{file_name_without_suffix}_{i}.txt')
+
 
 cv2.imwrite(f'{result_imgs_path}/mask.png', transformed_mask)
 cv2.imwrite(f'{result_imgs_path}/labeled_img.png', labeled_img)
