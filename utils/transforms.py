@@ -51,16 +51,32 @@ def elastic_transform(image, alpha, sigma, alpha_affine, random_state=None):
 
     return transformed_image
 
-def perspective_transform(image, mask, M, points):
 
+def perspective_transform(image, mask, M, points):
     # 获取图像尺寸
     h, w = image.shape[:2]
 
+    # 计算透视变换后的图像边界
+    corners = np.array([[0, 0], [w, 0], [w, h], [0, h]], dtype=np.float32)
+    transformed_corners = cv2.perspectiveTransform(np.array([corners], dtype=np.float32), M).squeeze()
+
+    # 计算新的图像尺寸
+    x_min, y_min = np.min(transformed_corners, axis=0).astype(int)
+    x_max, y_max = np.max(transformed_corners, axis=0).astype(int)
+
+    # 计算输出图像尺寸
+    new_w = x_max - x_min
+    new_h = y_max - y_min
+
+    # 调整透视变换矩阵
+    translation_matrix = np.array([[1, 0, -x_min], [0, 1, -y_min], [0, 0, 1]], dtype=np.float32)
+    new_M = np.dot(translation_matrix, M)
+
     # 应用透视变换
-    transformed_image = cv2.warpPerspective(image, M, (w, h))
+    transformed_image = cv2.warpPerspective(image, new_M, (new_w, new_h))
+    trans_mask = cv2.warpPerspective(mask, new_M, (new_w, new_h))
 
-    trans_mask = cv2.warpPerspective(mask, M, (w, h))
-
-    transformed_points = cv2.perspectiveTransform(np.array([points], dtype=np.float32), M).squeeze()
+    # 变换检测框顶点
+    transformed_points = cv2.perspectiveTransform(np.array([points], dtype=np.float32), new_M).squeeze()
 
     return transformed_image, trans_mask, transformed_points

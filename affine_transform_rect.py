@@ -70,7 +70,6 @@ for label_path in label_paths:
             class_name = label['label']
             label_points = label['points']
 
-
             # 对一个标签进行多次随机变换
             for k in range(random_times):
                 label_points = np.array(label_points, dtype=np.int32)
@@ -92,11 +91,12 @@ for label_path in label_paths:
                 labeled_img = img[y1:y2, x1:x2, :]
                 # 标签区域的掩码
                 mask = np.zeros(labeled_img.shape, dtype=np.uint8)
+                relative_label_points = label_points - np.array([x1, y1])
                 if len(label_points) >= 3:
-                    relative_label_points = label_points - np.array([x1, y1])
+
                     cv2.fillPoly(mask, [relative_label_points], (255, 255, 255))
                 else:
-                    cv2.rectangle(mask, *label_points, (255, 255, 255),thickness=-1)
+                    cv2.rectangle(mask, relative_label_points[0],relative_label_points[1], (255, 255, 255), thickness=-1)
                 # mask = np.ones(labeled_img.shape, dtype=np.uint8) * 255
 
                 # 弹性变换
@@ -114,8 +114,9 @@ for label_path in label_paths:
                     elastic_transformed_img, mask, transform_matrix, relative_label_points)
 
                 transformed_label_points = transformed_label_points + np.array([x1, y1])
-                dx = np.random.randint(-10 ,10 )
-                dy = np.random.randint(- 10, 10)
+                d_ratio = 0.4
+                dx = np.random.randint(-label_width * d_ratio, label_width * d_ratio)
+                dy = np.random.randint(- label_height * d_ratio, label_height * d_ratio)
                 random_cneter = (label_center[0] + dx,
                                  label_center[1] + dy)
 
@@ -130,16 +131,15 @@ for label_path in label_paths:
                 #     status = False
                 #     continue
 
-
                 # 更新标签未完善
                 """
                 -NORMAL_CLONE: 不保留dst 图像的texture细节。目标区域的梯度只由源图像决定。
                 -MIXED_CLONE: 保留dest图像的texture 细节。目标区域的梯度是由原图像和目的图像的组合计算出来(计算dominat gradient)。
                 -MONOCHROME_TRANSFER: 不保留src图像的颜色细节，只有src图像的质地，颜色和目标图像一样，可以用来进行皮肤质地填充。
-    
+
                 """
                 augmented_img = cv2.seamlessClone(perspective_transformed_img, augmented_img, transformed_mask,
-                                              random_cneter, cv2.MIXED_CLONE)
+                                                  random_cneter, cv2.MIXED_CLONE)
 
                 # 定义两个多边形并检查有效性
                 union_rect = get_bounding_box(rect_label_points, transformed_label_points)
@@ -158,6 +158,8 @@ for label_path in label_paths:
             cv2.imwrite(f'{result_imgs_path}/{file_name_without_suffix}_{i}.png', augmented_img)
             labelme_data['version'] = '5.2.0'
             labelme_data['shapes'] = new_shaps
+            labelme_data['imagePath'] = f'../imgs/{file_name_without_suffix}_{i}.png'
+            labelme_data['imageData'] = None
 
             save_labelme_json(labelme_data, f'{result_labels_path}/{file_name_without_suffix}_{i}.json')
 

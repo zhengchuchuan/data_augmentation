@@ -1,5 +1,5 @@
 import numpy as np
-
+from shapely.validation import make_valid
 
 def generate_random_transform_matrix(image_shape, scale_range=(0.8, 1.2), rotation_range=(-10, 10),
                                      translation_range=(0.1, 0.3), shear_range=(-10, 10)):
@@ -78,3 +78,30 @@ def rectangle_union(rect1, rect2):
 
     # Return union rectangle as a tuple of tuples
     return ((xmin, ymin), (xmax, ymax))
+
+def validate_polygon(polygon):
+    if not polygon.is_valid:
+        polygon = make_valid(polygon)
+    return polygon
+
+
+def get_bounding_box(rect1, rect2):
+    # rect1 和 rect2 都是两个顶点坐标的列表，表示矩形的左上角和右下角
+    # 例如: rect1 = [(x1_min, y1_min), (x1_max, y1_max)]
+
+    # 提取两个矩形的顶点坐标
+    x1_min, y1_min = rect1[0]
+    x1_max, y1_max = rect1[1]
+
+    x2_min, y2_min = rect2[0]
+    x2_max, y2_max = rect2[1]
+
+    # 计算并集的最小外接矩形
+    x_min = min(x1_min, x2_min)
+    y_min = min(y1_min, y2_min)
+    x_max = max(x1_max, x2_max)
+    y_max = max(y1_max, y2_max)
+
+    # 返回最小外接矩形的顶点坐标
+    bounding_box = [(x_min, y_min), (x_max, y_max)]
+    return bounding_box
