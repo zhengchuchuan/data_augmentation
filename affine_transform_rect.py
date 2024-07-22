@@ -9,7 +9,7 @@ from shapely.geometry import Polygon
 from shapely.ops import unary_union
 
 from utils.utils import generate_random_transform_matrix, rectangle_union, validate_polygon, get_bounding_box
-from utils.transforms import elastic_transform, perspective_transform
+from utils.transforms import elastic_transform, perspective_transform_with_mask
 from utils.data_process import xywh_rect_to_x1y1x2y2
 from utils.file_io import make_sure_paths_exist, read_lines_to_list
 from utils.img_label_utils import read_yolo_labels, read_labelme_json, yolo_to_labelme_json, save_labelme_json, \
@@ -111,7 +111,7 @@ for label_path in label_paths:
                                                                     translation_range=(0.1, 0.3),
                                                                     shear_range=(-10, 10))
                 # 应用透视变换, 返回变换后的图像、更新后的检测框列表和掩码
-                perspective_transformed_img, transformed_mask, transformed_label_points = perspective_transform(
+                perspective_transformed_img, transformed_mask, transformed_label_points = perspective_transform_with_mask(
                     elastic_transformed_img, mask, transform_matrix, relative_label_points)
 
                 transformed_label_points = transformed_label_points + np.array([x1, y1])

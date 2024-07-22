@@ -105,3 +105,18 @@ def get_bounding_box(rect1, rect2):
     # 返回最小外接矩形的顶点坐标
     bounding_box = [(x_min, y_min), (x_max, y_max)]
     return bounding_box
+
+
+def is_overlap(rect1, rect2):
+    """
+    检查两个矩形是否重叠
+    :param rect1: 第一个矩形 ((x1, y1), (x2, y2))
+    :param rect2: 第二个矩形 ((x1, y1), (x2, y2))
+    :return: 如果重叠返回True，否则返回False
+    """
+    (x1_min, y1_min), (x1_max, y1_max) = rect1
+    (x2_min, y2_min), (x2_max, y2_max) = rect2
+
+    if x1_max <= x2_min or x2_max <= x1_min or y1_max <= y2_min or y2_max <= y1_min:
+        return False
+    return True

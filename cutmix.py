@@ -5,12 +5,15 @@ import cv2
 import numpy as np
 from tqdm import tqdm
 
-from utils.utils import generate_random_transform_matrix, rectangle_union, validate_polygon, get_bounding_box
+from utils.utils import generate_random_transform_matrix, rectangle_union, validate_polygon, get_bounding_box, \
+    is_overlap
 from utils.transforms import elastic_transform, perspective_transform
 from utils.data_process import xywh_rect_to_x1y1x2y2
 from utils.file_io import make_sure_paths_exist, read_lines_to_list
 from utils.img_label_utils import read_yolo_labels, read_labelme_json, yolo_to_labelme_json, save_labelme_json, \
     labelme_json_to_yolo, save_yolo_labels, points_to_yolo_label
+
+from utils.utils import generate_random_transform_matrix
 
 per_background_nums = 2
 paste_nums = 5
@@ -26,6 +29,8 @@ make_sure_paths_exist(save_img_path, save_label_path)
 
 background_list = read_lines_to_list(background_list_path)
 foreground_list = read_lines_to_list(foreground_list_path)
+
+
 
 for i, background_path in enumerate(tqdm(background_list)):
 
@@ -55,27 +60,68 @@ for i, background_path in enumerate(tqdm(background_list)):
             alpha_foreground = foreground_img[:, :, 3] / 255.0
             alpha_background = 1.0 - alpha_foreground
 
-            # 随机选择粘贴位置
-            paste_x = random.randint(0, background_width - foreground_width)
-            paste_y = random.randint(0, background_height - foreground_height)
+            # 生成随机透视变换矩阵
+            transform_matrix = generate_random_transform_matrix(foreground_img.shape,
+                                                                scale_range=(0.8, 1.2),
+                                                                rotation_range=(-15, 15),
+                                                                translation_range=(0.1, 0.3),
+                                                                shear_range=(-10, 10))
 
-            # 确保前景图像不会超出背景图像的边界
-            if paste_x + foreground_width > background_width or paste_y + foreground_height > background_height:
-                raise ValueError("Foreground image exceeds background image boundaries")
+            # transformed_foreground_img = perspective_transform(foreground_img, transform_matrix)
+            transformed_foreground_img = foreground_img
+            transed_foreground_height, transed_foreground_width, _ = transformed_foreground_img.shape
 
-            x_end = paste_x + foreground_width
-            y_end = paste_y + foreground_height
 
-            points = ((paste_x, paste_y), (x_end,y_end))
+            # 不满足条件则重新选择位置,最多尝试10次
+            max_attempts = 10
+            for attempt in range(max_attempts):
+                # 随机选择粘贴位置
+                paste_x = random.randint(0, background_width - transed_foreground_width)
+                paste_y = random.randint(0, background_height - transed_foreground_height)
 
-            # 混合图像
-            for c in range(0, 3):
-                fusion_img[paste_y:y_end, paste_x:x_end, c] = \
-                    (alpha_foreground * foreground_img[:, :, c] + alpha_background * fusion_img[paste_y:y_end,paste_x:x_end, c])
+                # 确保前景图像不会超出背景图像的边界
+                if paste_x + transed_foreground_width > background_width or paste_y + transed_foreground_height > background_height:
+                    continue
 
-            # 保存标签
-            label = points_to_yolo_label(points, class_idx,fusion_img.shape)
-            labels.append(label)
+                x_end = paste_x + transed_foreground_width
+                y_end = paste_y + transed_foreground_height
+
+                points = ((paste_x, paste_y), (x_end, y_end))
+
+                # 计算背景区域的平均亮度
+                background_roi = fusion_img[paste_y:y_end, paste_x:x_end]
+                background_brightness = np.mean(cv2.cvtColor(background_roi, cv2.COLOR_BGR2GRAY))
+                foreground_brightness = np.mean(cv2.cvtColor(transformed_foreground_img[:, :, :3], cv2.COLOR_BGR2GRAY))
+
+                # 如果背景区域的平均亮度低于前景图像的平均亮度，则放弃此轮粘贴
+                if background_brightness < foreground_brightness:
+                    continue
+
+                # 检查标签是否重叠
+                overlap = False
+                for label in labels:
+                    _, center_x, center_y, width, height = label
+                    x1 = center_x - width / 2
+                    y1 = center_y - height / 2
+                    x2 = center_x + width / 2
+                    y2 = center_y + height / 2
+                    label_points = ((x1, y1), (x2, y2))
+                    if is_overlap(points, label_points):
+                        overlap = True
+                        break
+
+                if overlap:
+                    continue
+
+                # 混合图像
+                for c in range(0, 3):
+                    fusion_img[paste_y:y_end, paste_x:x_end, c] = \
+                        (alpha_foreground * transformed_foreground_img[:, :, c] + alpha_background * fusion_img[paste_y:y_end, paste_x:x_end, c])
+
+                # 保存标签
+                label = points_to_yolo_label(points, class_idx, fusion_img.shape)
+                labels.append(label)
+                break
 
         # 保存结果图像
         result_img_name = f'{save_name}_{j}.png'
@@ -85,7 +131,5 @@ for i, background_path in enumerate(tqdm(background_list)):
         result_label_name = f'{save_name}_{j}.txt'
         result_label_path = os.path.join(save_label_path, result_label_name)
 
-
         cv2.imwrite(result_img_path, fusion_img)
         save_yolo_labels(labels, result_label_path)
-
