@@ -1,0 +1,2 @@
+data\cutmix_data/background\20240712_01_001.png
+data\cutmix_data/background\20240712_01_002.png

@@ -228,3 +228,5 @@ def xywh_rect_to_x1y1x2y2(xywh_rect):
     y2 = y + h
 
     return ((x1, y1), (x2, y2))
+
+

@@ -127,8 +127,8 @@ def labelme_json_to_yolo(labelme_annotations, classes):
             ymax = max(y_coords)
 
             # Convert to YOLO format (normalized center_x, center_y, width, height)
-            center_x = (xmin + xmax) / 2 / image_width
-            center_y = (ymin + ymax) / 2 / image_height
+            center_x = (xmin + xmax) / 2.0 / image_width
+            center_y = (ymin + ymax) / 2.0 / image_height
             width = (xmax - xmin) / image_width
             height = (ymax - ymin) / image_height
 
@@ -139,3 +139,21 @@ def labelme_json_to_yolo(labelme_annotations, classes):
             yolo_annotations.append((class_index, center_x, center_y, width, height))
 
     return yolo_annotations
+
+
+
+def points_to_yolo_label(points,class_idx,img_shape):
+    img_height, img_width, _ = img_shape
+    x_start, y_start = points[0]
+    x_end, y_end = points[1]
+    label_width = x_end - x_start
+    label_height = y_end - y_start
+
+    center_x = (x_start + x_end) / 2.0 / img_width
+    center_y = (y_start + y_end) / 2.0 / img_height
+
+    label_width = label_width / img_width
+    label_height = label_height / img_height
+
+
+    return class_idx, center_x, center_y, label_width, label_height
