@@ -56,9 +56,7 @@ for i, background_path in enumerate(tqdm(background_list)):
             if foreground_channels != 4:
                 raise ValueError(f"Foreground image {foreground_list[k]} does not have alpha channels")
 
-            # 提取前景图像的 alpha 通道，并归一化到 [0, 1] 范围
-            alpha_foreground = foreground_img[:, :, 3] / 255.0
-            alpha_background = 1.0 - alpha_foreground
+
 
             # 生成随机透视变换矩阵
             transform_matrix = generate_random_transform_matrix(foreground_img.shape,
@@ -67,10 +65,13 @@ for i, background_path in enumerate(tqdm(background_list)):
                                                                 translation_range=(0.1, 0.3),
                                                                 shear_range=(-10, 10))
 
-            # transformed_foreground_img = perspective_transform(foreground_img, transform_matrix)
-            transformed_foreground_img = foreground_img
+            transformed_foreground_img = perspective_transform(foreground_img, transform_matrix)
+            # transformed_foreground_img = foreground_img
             transed_foreground_height, transed_foreground_width, _ = transformed_foreground_img.shape
 
+            # 提取前景图像的 alpha 通道，并归一化到 [0, 1] 范围
+            alpha_foreground = transformed_foreground_img[:, :, 3] / 255.0
+            alpha_background = 1.0 - alpha_foreground
 
             # 不满足条件则重新选择位置,最多尝试10次
             max_attempts = 10
@@ -114,9 +115,10 @@ for i, background_path in enumerate(tqdm(background_list)):
                     continue
 
                 # 混合图像
+                fusion_img_patch = fusion_img[paste_y:y_end, paste_x:x_end]
                 for c in range(0, 3):
                     fusion_img[paste_y:y_end, paste_x:x_end, c] = \
-                        (alpha_foreground * transformed_foreground_img[:, :, c] + alpha_background * fusion_img[paste_y:y_end, paste_x:x_end, c])
+                        (alpha_foreground * transformed_foreground_img[:, :, c] + alpha_background * fusion_img_patch[:, :, c])
 
                 # 保存标签
                 label = points_to_yolo_label(points, class_idx, fusion_img.shape)
