@@ -19,6 +19,7 @@ make_sure_paths_exist(save_img_path, save_img_path)
 
 foreground_path_list = read_lines_to_list(foreground_list_path)
 
+
 def get_bounding_box(image):
     """Get the bounding box of the non-zero regions in an image."""
     gray = cv2.cvtColor(image, cv2.COLOR_BGRA2GRAY)
@@ -28,6 +29,7 @@ def get_bounding_box(image):
         return 0, 0, image.shape[1], image.shape[0]
     x, y, w, h = cv2.boundingRect(contours[0])
     return x, y, w, h
+
 
 for i, foreground_path in enumerate(tqdm(foreground_path_list)):
     foreground_img = cv2.imread(foreground_path, cv2.IMREAD_UNCHANGED)  # Read image with alpha channel
@@ -40,7 +42,7 @@ for i, foreground_path in enumerate(tqdm(foreground_path_list)):
         # 最后增强叠加的图像
         augmented_img = foreground_img.copy()
 
-        num_layers = random.randint(1, 3)  # Random number of layers to add
+        num_layers = random.randint(2, 5)  # Random number of layers to add
         layer_imgs = []
         for k in range(num_layers):
             # 每次用原始图像进行比变换
@@ -49,10 +51,10 @@ for i, foreground_path in enumerate(tqdm(foreground_path_list)):
             for t in range(transform_times):
                 if random.random() > 0.5:
                     transform_matrix = generate_random_transform_matrix(layer_img.shape,
-                                                                        scale_range=(0.9, 1.1),
-                                                                        rotation_range=(-15, 15),
-                                                                        translation_range=(0.1, 0.2),
-                                                                        shear_range=(-10, 10))
+                                                                        scale_range=(0.8, 1.2),
+                                                                        rotation_range=(-20, 20),
+                                                                        translation_range=(-0.2, 0.2),
+                                                                        shear_range=(-20, 20))
                     # Adjust the warpPerspective function to allow larger output size
                     layer_img = perspective_transform(layer_img, transform_matrix)
                     layer_img = elastic_transform(layer_img, alpha=foreground_height * 0.1,
@@ -64,21 +66,35 @@ for i, foreground_path in enumerate(tqdm(foreground_path_list)):
         max_width = max([layer_img.shape[1] for layer_img in layer_imgs])
 
         augmented_img = np.zeros((max_height, max_width, 4), dtype=np.uint8)
+        mask = None
         for layer_img in layer_imgs:
             h, w = layer_img.shape[:2]
-            y = random.randint(0, max_height - h)
-            x = random.randint(0, max_width - w)
+            # 中心店有问题
+            center_x = random.randint(w // 2, max_width - w // 2)
+            center_y = random.randint(h // 2, max_height - h // 2)
 
+            x_min = center_x - w // 2
+            y_min = center_y - h // 2
+            x_max = center_x + w // 2
+            y_max = center_y + h // 2
 
-            alpha_s = layer_img[:, :, 3] / 255.0
-            alpha_l = 1.0 - alpha_s
+            if mask is None:
+                mask = np.ones((max_height, max_width), dtype=np.uint8) * 255
+            else:
+                mask = augmented_img[:, :, 3]
 
-            for c in range(0, 3):
-                augmented_img[y:y + h, x:x + w, c] = (
-                        alpha_s * layer_img[:, :, c] + alpha_l * augmented_img[y:y + h, x:x + w, c])
+            augmented_img[y_min:y_max, x_min:x_max, :3] = cv2.seamlessClone(layer_img, augmented_img[y_min:y_max, x_min:x_max, :3],
+                                                                    mask, (center_y,center_x), cv2.NORMAL_CLONE)
+
+            # alpha_s = layer_img[:, :, 3] / 255.0
+            # alpha_l = 1.0 - alpha_s
+
+            # for c in range(0, 3):
+            #     augmented_img[y:y + h, x:x + w, c] = (
+            #             alpha_s * layer_img[:, :, c] + alpha_l * augmented_img[y:y + h, x:x + w, c])
             # 更新alpha通道
-            augmented_img[y:y + h, x:x + w, 3] = np.maximum(
-                augmented_img[y:y + h, x:x + w, 3], layer_img[:, :, 3])
+            augmented_img[y_min:y_max, x_min:x_max, :3] = np.maximum(
+                augmented_img[y_min:y_max, x_min:x_max, :3], layer_img[:, :, 3])
 
         # Get the bounding box of the augmented image to make the edges tight
         # x, y, w, h = get_bounding_box(augmented_img)

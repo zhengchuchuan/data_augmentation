@@ -1,0 +1,4 @@
+data\cutmix_data/source_foreground\1.png
+data\cutmix_data/source_foreground\3.png
+data\cutmix_data/source_foreground\4.png
+data\cutmix_data/source_foreground\6.png
