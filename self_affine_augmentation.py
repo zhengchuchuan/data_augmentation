@@ -31,6 +31,21 @@ def get_bounding_box(image):
     return x, y, w, h
 
 
+def alpha_blend(img1, img2, x, y):
+    """Blend img2 onto img1 at position (x, y) using alpha blending."""
+    alpha_s = img2[:, :, 3] / 255.0
+    alpha_l = 1.0 - alpha_s
+
+    for c in range(0, 3):
+        img1[y:y + img2.shape[0], x:x + img2.shape[1], c] = (
+                alpha_s * img2[:, :, c] + alpha_l * img1[y:y + img2.shape[0], x:x + img2.shape[1], c]
+        )
+
+    img1[y:y + img2.shape[0], x:x + img2.shape[1], 3] = np.maximum(
+        img1[y:y + img2.shape[0], x:x + img2.shape[1], 3], img2[:, :, 3]
+    )
+
+
 for i, foreground_path in enumerate(tqdm(foreground_path_list)):
     foreground_img = cv2.imread(foreground_path, cv2.IMREAD_UNCHANGED)  # Read image with alpha channel
 
@@ -40,9 +55,9 @@ for i, foreground_path in enumerate(tqdm(foreground_path_list)):
     for j in range(generate_nums):
         # Create a larger canvas for the augmented image to accommodate transformations
         # 最后增强叠加的图像
-        augmented_img = foreground_img.copy()
+        augmented_img = np.zeros((foreground_height, foreground_width, 4), dtype=np.uint8)
 
-        num_layers = random.randint(2, 5)  # Random number of layers to add
+        num_layers = random.randint(1, 5)  # Random number of layers to add
         layer_imgs = []
         for k in range(num_layers):
             # 每次用原始图像进行比变换
@@ -52,7 +67,7 @@ for i, foreground_path in enumerate(tqdm(foreground_path_list)):
                 if random.random() > 0.5:
                     transform_matrix = generate_random_transform_matrix(layer_img.shape,
                                                                         scale_range=(0.8, 1.2),
-                                                                        rotation_range=(-20, 20),
+                                                                        rotation_range=(-30, 30),
                                                                         translation_range=(-0.2, 0.2),
                                                                         shear_range=(-20, 20))
                     # Adjust the warpPerspective function to allow larger output size
@@ -65,40 +80,16 @@ for i, foreground_path in enumerate(tqdm(foreground_path_list)):
         max_height = max([layer_img.shape[0] for layer_img in layer_imgs])
         max_width = max([layer_img.shape[1] for layer_img in layer_imgs])
 
-        augmented_img = np.zeros((max_height, max_width, 4), dtype=np.uint8)
-        mask = None
+        canvas = np.zeros((max_height, max_width, 4), dtype=np.uint8)
         for layer_img in layer_imgs:
             h, w = layer_img.shape[:2]
-            # 中心店有问题
-            center_x = random.randint(w // 2, max_width - w // 2)
-            center_y = random.randint(h // 2, max_height - h // 2)
-
-            x_min = center_x - w // 2
-            y_min = center_y - h // 2
-            x_max = center_x + w // 2
-            y_max = center_y + h // 2
-
-            if mask is None:
-                mask = np.ones((max_height, max_width), dtype=np.uint8) * 255
-            else:
-                mask = augmented_img[:, :, 3]
-
-            augmented_img[y_min:y_max, x_min:x_max, :3] = cv2.seamlessClone(layer_img, augmented_img[y_min:y_max, x_min:x_max, :3],
-                                                                    mask, (center_y,center_x), cv2.NORMAL_CLONE)
-
-            # alpha_s = layer_img[:, :, 3] / 255.0
-            # alpha_l = 1.0 - alpha_s
-
-            # for c in range(0, 3):
-            #     augmented_img[y:y + h, x:x + w, c] = (
-            #             alpha_s * layer_img[:, :, c] + alpha_l * augmented_img[y:y + h, x:x + w, c])
-            # 更新alpha通道
-            augmented_img[y_min:y_max, x_min:x_max, :3] = np.maximum(
-                augmented_img[y_min:y_max, x_min:x_max, :3], layer_img[:, :, 3])
+            y = random.randint(0, max_height - h)
+            x = random.randint(0, max_width - w)
+            alpha_blend(canvas, layer_img, x, y)
 
         # Get the bounding box of the augmented image to make the edges tight
-        # x, y, w, h = get_bounding_box(augmented_img)
-        # tight_augmented_img = augmented_img[y:y + h, x:x + w]
+        x, y, w, h = get_bounding_box(canvas)
+        tight_augmented_img = canvas[y:y + h, x:x + w]
 
         save_path = os.path.join(save_img_path, f'{foreground_base_name}_{j}.png')
-        cv2.imwrite(save_path, augmented_img)
+        cv2.imwrite(save_path, tight_augmented_img)
