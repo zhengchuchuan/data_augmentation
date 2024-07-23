@@ -58,7 +58,7 @@ for label_path in label_paths:
 
     labelme_labels = labelme_data['shapes']
 
-    generate_nums = 20
+    generate_nums = 200
     random_times = 2
 
     for i in tqdm(range(generate_nums)):

@@ -21,6 +21,7 @@ paste_nums = 5
 class_idx = 2
 
 background_list_path = 'data/data_list/background_list.txt'
+background_label_path = None
 foreground_list_path = 'data/data_list/foreground_list.txt'
 save_img_path = 'exp/cutmix_result/imgs'
 save_label_path = 'exp/cutmix_result/labels'
@@ -38,34 +39,57 @@ for i, background_path in enumerate(tqdm(background_list)):
     save_name = os.path.splitext(os.path.basename(background_path))[0]
     background_height, background_width, _ = background_img.shape
 
-    # 随机选择n个前景粘贴
-    if paste_nums > len(foreground_list):
-        paste_nums = len(foreground_list)
-        print(f'Warning: paste_nums is larger than the number of foreground images, set paste_nums to {paste_nums}')
-    random_foreground_list_idx = random.sample(range(len(foreground_list)), paste_nums)
+
+    # 待完善,当背景图像也有标签时
+    if background_label_path is not None:
+        pass
+
+
 
     for j in range(per_background_nums):
         fusion_img = background_img.copy()
+
+        # 背景弹性变形
+        fusion_img = elastic_transform(fusion_img, alpha=background_height * 0.2,
+                              sigma=background_height * 0.02, alpha_affine=background_height * 0.02)
         labels = []
 
-        for k in random_foreground_list_idx:
+        # 随机选择n个前景粘贴
+        # if paste_nums > len(foreground_list):
+        #     paste_nums = len(foreground_list)
+        #     print(f'Warning: paste_nums is larger than the number of foreground images, set paste_nums to {paste_nums}')
+        # random_foreground_list_idx = random.sample(range(len(foreground_list)), paste_nums)
+
+        # 随机选择n个前景粘贴
+        if paste_nums > len(foreground_list):
+            print(
+                f'Warning: paste_nums is larger than the number of foreground images, some images will be reused to match paste_nums')
+        extended_foreground_list = foreground_list * (paste_nums // len(foreground_list)) + random.sample(
+            foreground_list, paste_nums % len(foreground_list))
+        random_foreground_list = random.sample(extended_foreground_list, paste_nums)
+
+        for foreground_path in random_foreground_list:
             # 读取前景图像，png不忽略透明度
-            foreground_img = cv2.imread(foreground_list[k], cv2.IMREAD_UNCHANGED)
+            foreground_img = cv2.imread(foreground_path, cv2.IMREAD_UNCHANGED)
             foreground_height, foreground_width, foreground_channels = foreground_img.shape
 
             if foreground_channels != 4:
-                raise ValueError(f"Foreground image {foreground_list[k]} does not have alpha channels")
+                raise ValueError(f"Foreground image {foreground_path} does not have alpha channels")
+
+            # 前景弹性变形
+            elastic_transformed_foreground_img = elastic_transform(foreground_img, alpha=foreground_height * 0.1,
+                              sigma=foreground_height * 0.02, alpha_affine=foreground_height * 0.02)
 
 
 
             # 生成随机透视变换矩阵
-            transform_matrix = generate_random_transform_matrix(foreground_img.shape,
+            transform_matrix = generate_random_transform_matrix(elastic_transformed_foreground_img.shape,
                                                                 scale_range=(0.8, 1.2),
                                                                 rotation_range=(-15, 15),
                                                                 translation_range=(0.1, 0.3),
                                                                 shear_range=(-10, 10))
 
-            transformed_foreground_img = perspective_transform(foreground_img, transform_matrix)
+            transformed_foreground_img = perspective_transform(elastic_transformed_foreground_img, transform_matrix)
             # transformed_foreground_img = foreground_img
             transed_foreground_height, transed_foreground_width, _ = transformed_foreground_img.shape
 

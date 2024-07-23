@@ -30,6 +30,8 @@ def elastic_transform(image, alpha, sigma, alpha_affine, random_state=None):
                        center_square - square_size])
 
     pts2 = pts1 + random_state.uniform(-alpha_affine, alpha_affine, size=pts1.shape).astype(np.float32)
+
+
     # 计算仿射变换矩阵
     M = cv2.getAffineTransform(pts1, pts2)
     # 应用仿射变换
