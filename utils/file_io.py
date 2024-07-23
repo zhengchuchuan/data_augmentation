@@ -54,7 +54,7 @@ def read_lines_to_list(file_path):
     - list: 包含每行内容的列表
     """
     lines = []
-    with open(file_path, 'r') as file:
+    with open(file_path, 'r',encoding='utf-8') as file:
         for line in file:
             lines.append(line.strip())  # 去除每行头尾的空字符并加入到列表中
     return lines

@@ -10,4 +10,5 @@ gen
 
 data/imgs/*
 data/labels/*
+data/cutmix_data/*
 exp/*

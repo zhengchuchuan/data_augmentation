@@ -1,3 +1,4 @@
+from datetime import datetime
 import os
 import random
 
@@ -15,14 +16,14 @@ from utils.img_label_utils import read_yolo_labels, read_labelme_json, yolo_to_l
 
 from utils.utils import generate_random_transform_matrix
 
-per_background_nums = 2
-paste_nums = 5
+per_background_nums = 100
+paste_nums = 15
 # 标间类别索引
 class_idx = 2
 
 background_list_path = 'data/data_list/background_list.txt'
-background_label_path = None
 foreground_list_path = 'data/data_list/foreground_list.txt'
+classes_path = 'data/labels/classes.txt'
 save_img_path = 'exp/cutmix_result/imgs'
 save_label_path = 'exp/cutmix_result/labels'
 
@@ -31,28 +32,42 @@ make_sure_paths_exist(save_img_path, save_label_path)
 background_list = read_lines_to_list(background_list_path)
 foreground_list = read_lines_to_list(foreground_list_path)
 
-
-
 for i, background_path in enumerate(tqdm(background_list)):
-
     background_img = cv2.imread(background_path)
-    save_name = os.path.splitext(os.path.basename(background_path))[0]
+    background_dir_name = os.path.dirname(background_path)
+    background_dir_name = background_dir_name.replace('imgs', 'labels')
+    background_base_name = os.path.splitext(os.path.basename(background_path))[0]
     background_height, background_width, _ = background_img.shape
 
+    #
+    background_path_without_suffix = os.path.join(background_dir_name, background_base_name)
+    if os.path.exists(background_path_without_suffix + '.txt'):
+        background_label_path = background_path_without_suffix + '.txt'
+    elif os.path.exists(background_path_without_suffix + '.json'):
+        background_label_path = background_path_without_suffix + '.json'
+    else:
+        background_label_path = None
 
     # 待完善,当背景图像也有标签时
     if background_label_path is not None:
-        pass
-
-
+        # yolo格式
+        if background_label_path.endswith('.txt'):
+            background_labels = read_yolo_labels(background_label_path)
+        # labelme格式
+        elif background_label_path.endswith('.json'):
+            background_labelme_data = read_labelme_json(background_label_path)
+            classes = read_lines_to_list(classes_path)
+            background_labels = labelme_json_to_yolo(background_labelme_data, classes)
+        else:
+            raise ValueError(f'Unsupported label file format: {background_label_path}')
 
     for j in range(per_background_nums):
         fusion_img = background_img.copy()
 
         # 背景弹性变形
         fusion_img = elastic_transform(fusion_img, alpha=background_height * 0.2,
-                              sigma=background_height * 0.02, alpha_affine=background_height * 0.02)
-        labels = []
+                                       sigma=background_height * 0.02, alpha_affine=background_height * 0.02)
+        labels = background_labels.copy() if background_label_path is not None else []
 
         # 随机选择n个前景粘贴
         # if paste_nums > len(foreground_list):
@@ -78,9 +93,8 @@ for i, background_path in enumerate(tqdm(background_list)):
 
             # 前景弹性变形
             elastic_transformed_foreground_img = elastic_transform(foreground_img, alpha=foreground_height * 0.1,
-                              sigma=foreground_height * 0.02, alpha_affine=foreground_height * 0.02)
-
-
+                                                                   sigma=foreground_height * 0.02,
+                                                                   alpha_affine=foreground_height * 0.02)
 
             # 生成随机透视变换矩阵
             transform_matrix = generate_random_transform_matrix(elastic_transformed_foreground_img.shape,
@@ -142,19 +156,25 @@ for i, background_path in enumerate(tqdm(background_list)):
                 fusion_img_patch = fusion_img[paste_y:y_end, paste_x:x_end]
                 for c in range(0, 3):
                     fusion_img[paste_y:y_end, paste_x:x_end, c] = \
-                        (alpha_foreground * transformed_foreground_img[:, :, c] + alpha_background * fusion_img_patch[:, :, c])
+                        (alpha_foreground * transformed_foreground_img[:, :, c] + alpha_background * fusion_img_patch[:,
+                                                                                                     :, c])
 
                 # 保存标签
                 label = points_to_yolo_label(points, class_idx, fusion_img.shape)
                 labels.append(label)
                 break
 
+        # 获取当前日期和时间
+        now = datetime.now()
+        # 指定日期格式：年-月-日
+        formatted_date = now.strftime("%Y%m%d")
+
         # 保存结果图像
-        result_img_name = f'{save_name}_{j}.png'
+        result_img_name = f'{formatted_date}_{background_base_name}_{j}.png'
         result_img_path = os.path.join(save_img_path, result_img_name)
 
         # 保存标签
-        result_label_name = f'{save_name}_{j}.txt'
+        result_label_name = f'{formatted_date}_{background_base_name}_{j}.txt'
         result_label_path = os.path.join(save_label_path, result_label_name)
 
         cv2.imwrite(result_img_path, fusion_img)
