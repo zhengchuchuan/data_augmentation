@@ -20,17 +20,6 @@ make_sure_paths_exist(save_img_path, save_img_path)
 foreground_path_list = read_lines_to_list(foreground_list_path)
 
 
-def get_bounding_box(image):
-    """Get the bounding box of the non-zero regions in an image."""
-    gray = cv2.cvtColor(image, cv2.COLOR_BGRA2GRAY)
-    _, thresh = cv2.threshold(gray, 1, 255, cv2.THRESH_BINARY)
-    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    if len(contours) == 0:
-        return 0, 0, image.shape[1], image.shape[0]
-    x, y, w, h = cv2.boundingRect(contours[0])
-    return x, y, w, h
-
-
 def alpha_blend(img1, img2, x, y):
     """Blend img2 onto img1 at position (x, y) using alpha blending."""
     alpha_s = img2[:, :, 3] / 255.0
@@ -67,29 +56,25 @@ for i, foreground_path in enumerate(tqdm(foreground_path_list)):
                 if random.random() > 0.5:
                     transform_matrix = generate_random_transform_matrix(layer_img.shape,
                                                                         scale_range=(0.8, 1.2),
-                                                                        rotation_range=(-30, 30),
+                                                                        rotation_range=(-15, 15),
                                                                         translation_range=(-0.2, 0.2),
-                                                                        shear_range=(-20, 20))
+                                                                        shear_range=(-10, 10))
                     # Adjust the warpPerspective function to allow larger output size
                     layer_img = perspective_transform(layer_img, transform_matrix)
-                    layer_img = elastic_transform(layer_img, alpha=foreground_height * 0.1,
-                                                  sigma=foreground_height * 0.05,
-                                                  alpha_affine=foreground_height * 0.03)
+                    layer_img = elastic_transform(layer_img, alpha=foreground_height * 0.2,
+                                                  sigma=foreground_height * 0.1,
+                                                  alpha_affine=foreground_height * 0.1)
             layer_imgs.append(layer_img)
 
         max_height = max([layer_img.shape[0] for layer_img in layer_imgs])
         max_width = max([layer_img.shape[1] for layer_img in layer_imgs])
 
-        canvas = np.zeros((max_height, max_width, 4), dtype=np.uint8)
+        augmented_img = np.zeros((max_height, max_width, 4), dtype=np.uint8)
         for layer_img in layer_imgs:
             h, w = layer_img.shape[:2]
             y = random.randint(0, max_height - h)
             x = random.randint(0, max_width - w)
-            alpha_blend(canvas, layer_img, x, y)
-
-        # Get the bounding box of the augmented image to make the edges tight
-        x, y, w, h = get_bounding_box(canvas)
-        tight_augmented_img = canvas[y:y + h, x:x + w]
+            alpha_blend(augmented_img, layer_img, x, y)
 
         save_path = os.path.join(save_img_path, f'{foreground_base_name}_{j}.png')
-        cv2.imwrite(save_path, tight_augmented_img)
+        cv2.imwrite(save_path, augmented_img)
