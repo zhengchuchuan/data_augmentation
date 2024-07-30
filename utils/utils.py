@@ -1,3 +1,4 @@
+import cv2
 import numpy as np
 from shapely.validation import make_valid
 
@@ -59,25 +60,26 @@ def generate_random_transform_matrix(image_shape, scale_range=(0.8, 1.2), rotati
 
     return transform_matrix
 
-def rectangle_union(rect1, rect2):
-    # rect1 and rect2 are tuples of tuples representing rectangles:
-    # rect1 = ((x1_1, y1_1), (x1_2, y1_2))
-    # rect2 = ((x2_1, y2_1), (x2_2, y2_2))
+def rectangle_intersection(rect1, rect2):
+    """
+    判断两个矩形是否相交。
+    :param rect1: 第一个矩形的坐标，格式为 ((x1, y1), (x2, y2))
+    :param rect2: 第二个矩形的坐标，格式为 ((x1, y1), (x2, y2))
+    :return: 如果矩形相交，返回 True；否则返回 False
+    """
+    (x_min_a, y_min_a), (x_max_a, y_max_a) = rect1
+    (x_min_b, y_min_b), (x_max_b, y_max_b) = rect2
 
-    # Extract coordinates from rectangles
-    x1_1, y1_1 = rect1[0]
-    x1_2, y1_2 = rect1[1]
-    x2_1, y2_1 = rect2[0]
-    x2_2, y2_2 = rect2[1]
+    cross_x_min = max(x_min_a, x_min_b)  # 交叉部分的左上角 x 坐标
+    cross_y_min = max(y_min_a, y_min_b)  # 交叉部分的左上角 y 坐标
 
-    # Calculate union rectangle coordinates
-    xmin = min(x1_1, x1_2, x2_1, x2_2)
-    ymin = min(y1_1, y1_2, y2_1, y2_2)
-    xmax = max(x1_1, x1_2, x2_1, x2_2)
-    ymax = max(y1_1, y1_2, y2_1, y2_2)
+    cross_x_max = min(x_max_a, x_max_b)  # 交叉部分的右下角 x 坐标
+    cross_y_max = min(y_max_a, y_max_b)  # 交叉部分的右下角 y 坐标
 
-    # Return union rectangle as a tuple of tuples
-    return ((xmin, ymin), (xmax, ymax))
+    if cross_x_min >= cross_x_max or cross_y_min >= cross_y_max:
+        return False
+
+    return True
 
 def validate_polygon(polygon):
     if not polygon.is_valid:
@@ -109,14 +111,24 @@ def get_bounding_box(rect1, rect2):
 
 def is_overlap(rect1, rect2):
     """
-    检查两个矩形是否重叠
-    :param rect1: 第一个矩形 ((x1, y1), (x2, y2))
-    :param rect2: 第二个矩形 ((x1, y1), (x2, y2))
-    :return: 如果重叠返回True，否则返回False
+    判断两个矩形是否相交。
+    :param rect1: 第一个矩形的坐标，格式为 ((x1, y1), (x2, y2))
+    :param rect2: 第二个矩形的坐标，格式为 ((x1, y1), (x2, y2))
+    :return: 如果矩形相交，返回 True；否则返回 False
     """
-    (x1_min, y1_min), (x1_max, y1_max) = rect1
-    (x2_min, y2_min), (x2_max, y2_max) = rect2
+    (x1_a, y1_a), (x2_a, y2_a) = rect1
+    (x1_b, y1_b), (x2_b, y2_b) = rect2
 
-    if x1_max <= x2_min or x2_max <= x1_min or y1_max <= y2_min or y2_max <= y1_min:
+    # 确保 (x1, y1) 是左下角，(x2, y2) 是右上角
+    x1_a, x2_a = min(x1_a, x2_a), max(x1_a, x2_a)
+    y1_a, y2_a = min(y1_a, y2_a), max(y1_a, y2_a)
+    x1_b, x2_b = min(x1_b, x2_b), max(x1_b, x2_b)
+    y1_b, y2_b = min(y1_b, y2_b), max(y1_b, y2_b)
+
+    # 判断矩形是否相交
+    if x1_a > x2_b or x1_b > x2_a:
         return False
+    if y1_a > y2_b or y1_b > y2_a:
+        return False
+
     return True

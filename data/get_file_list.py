@@ -34,11 +34,11 @@ def get_data_path(file_paths, suffixes=None, prefix=None, file_name_pattern=None
     return filename_list
 
 
-data_dirs = [r'cutmix_data/source_foreground']
+data_dirs = [r'\\192.168.3.155\高光谱测试样本库\原油检测\00大庆现场测试\03标注数据以及模型文件\Generate\20240729\generate_foreground']
 save_dir = "data_list"
-list_name = 'source_foreground_list.txt'
-# list_name = 'background_list.txt'
-
+# list_name = '20240729_foreground_list.txt'
+# list_name = '20240729_background_list.txt'
+list_name = '20240729_generate_foreground_list.txt'
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
 
@@ -52,6 +52,7 @@ label_list = get_data_path(file_paths=data_dirs, suffixes=suffixes, prefix=prefi
                            process_folders=process_folders, ignore_files=ignore_files)
 
 print(len(label_list))
+label_list.sort()
 
 list_save_path = os.path.join(save_dir, list_name)
 

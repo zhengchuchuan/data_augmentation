@@ -8,7 +8,6 @@ out
 gen
 
 
-data/imgs/*
-data/labels/*
-data/cutmix_data/*
+data/*
+!data/get_file_list.py
 exp/*
