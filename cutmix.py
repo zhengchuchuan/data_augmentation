@@ -16,15 +16,16 @@ from utils.img_label_utils import read_yolo_labels, read_labelme_json, yolo_to_l
 per_background_nums = 10
 min_paste_nums = 2
 max_paste_nums = 4
-# 标间类别索引
-class_idx = 2
 
-background_list_path = r'\\192.168.3.155\高光谱测试样本库\原油检测\00大庆现场测试\03标注数据以及模型文件\Generate\20240729\20240729_background_list.txt'
-foreground_list_path = r'\\192.168.3.155\高光谱测试样本库\原油检测\00大庆现场测试\03标注数据以及模型文件\Generate\20240729\20240729_generate_foreground_list.txt'
-background_label_dir = r'\\192.168.3.155\高光谱测试样本库\原油检测\00大庆现场测试\03标注数据以及模型文件\Generate\label'
+
 classes_path = 'data/labels/classes.txt'
-save_img_path = r'\\192.168.3.155\高光谱测试样本库\原油检测\00大庆现场测试\03标注数据以及模型文件\Generate\20240729\imgs'
-save_label_path = r'\\192.168.3.155\高光谱测试样本库\原油检测\00大庆现场测试\03标注数据以及模型文件\Generate\20240729\labels'
+save_img_path = r'\\192.168.3.155\高光谱测试样本库\原油检测\00大庆现场测试\03标注数据以及模型文件\Generate\20240801\imgs'
+save_label_path = r'\\192.168.3.155\高光谱测试样本库\原油检测\00大庆现场测试\03标注数据以及模型文件\Generate\20240801\labels'
+
+background_list_path = r'\\192.168.3.155\高光谱测试样本库\原油检测\00大庆现场测试\03标注数据以及模型文件\Generate\20240801\20240801_background_list.txt'
+foreground_list_path = r'\\192.168.3.155\高光谱测试样本库\原油检测\00大庆现场测试\03标注数据以及模型文件\Generate\20240801\20240801_generate_foreground_list.txt'
+background_label_dir = r'\\192.168.3.155\高光谱测试样本库\原油检测\00大庆现场测试\03标注数据以及模型文件\00数据和标签\dataset8\have_label\label'
+
 
 make_sure_paths_exist(save_img_path, save_label_path)
 
@@ -67,12 +68,16 @@ for i, background_path in enumerate(tqdm(background_list)):
         fusion_img = elastic_transform(fusion_img, alpha=background_height * alpha_ratio,
                                        sigma=background_height * sigma_ratio)
 
+
         paste_nums = random.randint(min_paste_nums, max_paste_nums)
-        extended_foreground_list = foreground_list * (paste_nums // len(foreground_list)) + random.sample(
-            foreground_list, paste_nums % len(foreground_list))
-        random_foreground_list = random.sample(extended_foreground_list, paste_nums)
+        random_foreground_list = random.sample(foreground_list, paste_nums)
 
         for foreground_path in random_foreground_list:
+            # 根据文件夹名获取类别索引
+            foreground_dir_path, _ = os.path.split(foreground_path)
+            norm_path = os.path.normpath(foreground_dir_path)
+            class_idx = norm_path.split(os.sep)[-1]
+
             foreground_img = cv2.imdecode(np.fromfile(foreground_path, dtype=np.uint8), cv2.IMREAD_UNCHANGED)
             foreground_height, foreground_width, foreground_channels = foreground_img.shape
 

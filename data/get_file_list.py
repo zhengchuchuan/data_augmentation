@@ -1,16 +1,16 @@
 import glob
 import os
 import sys
-
+from tqdm import tqdm
 
 def get_data_path(file_paths, suffixes=None, prefix=None, file_name_pattern=None, process_folders=None,
                   ignore_files=None):
     filename_list = []
 
     # 每个文件夹路径
-    for file_path in file_paths:
-        # 处理文件夹的子目录
-        for root, dirs, files in os.walk(file_path):
+    for file_path in tqdm(file_paths, desc="Processing directories"):
+        # 处理文件夹的子目录，并添加进度条
+        for root, dirs, files in tqdm(os.walk(file_path), desc=f"Walking through {file_path}", leave=False):
             dir_paths = []
             root_dir = os.path.basename(root)
 
@@ -33,12 +33,11 @@ def get_data_path(file_paths, suffixes=None, prefix=None, file_name_pattern=None
 
     return filename_list
 
-
-data_dirs = [r'\\192.168.3.155\高光谱测试样本库\原油检测\00大庆现场测试\03标注数据以及模型文件\Generate\20240729\generate_foreground']
+data_dirs = [r'\\192.168.3.155\高光谱测试样本库\原油检测\00大庆现场测试\03标注数据以及模型文件\Generate\samples\select_20240731']
 save_dir = "data_list"
 # list_name = '20240729_foreground_list.txt'
-# list_name = '20240729_background_list.txt'
-list_name = '20240729_generate_foreground_list.txt'
+# list_name = '20240801_background_list.txt'
+list_name = '20240801_source_foreground_list.txt'
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
 
@@ -57,5 +56,5 @@ label_list.sort()
 list_save_path = os.path.join(save_dir, list_name)
 
 with open(list_save_path, "w", encoding='utf-8') as file:
-    for string in label_list:
+    for string in tqdm(label_list, desc="Writing to file"):
         file.write(string + "\n")
