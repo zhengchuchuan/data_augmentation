@@ -4,47 +4,51 @@ import numpy as np
 from tqdm import tqdm
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
-from utils.file_io import read_path_list
-from utils.label_utils import read_yolo_labels, read_labelme_json, yolo_to_labelme_json, save_labelme_json
+from utils.img_label_utils import read_yolo_labels, save_yolo_labels
 
 
-def save_images(labeled_imgs, labels, save_dir):
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
 
-    for label in np.unique(labels):
-        label_dir = os.path.join(save_dir, f'cluster_{label}')
+def save_clustered_images(labeled_imgs, clustered_labels, clustered_images_save_dir):
+    if not os.path.exists(clustered_images_save_dir):
+        os.makedirs(clustered_images_save_dir)
+
+    for label in np.unique(clustered_labels):
+        label_dir = os.path.join(clustered_images_save_dir, f'cluster_{label}')
         if not os.path.exists(label_dir):
             os.makedirs(label_dir)
 
-    for idx, (img, label) in enumerate(zip(labeled_imgs, labels)):
-        img_path = os.path.join(save_dir, f'cluster_{label}', f'{idx}.png')
-        # cv2.imwrite(img_path, img)
+    for idx, (img, label) in enumerate(zip(labeled_imgs, clustered_labels)):
+        img_path = os.path.join(clustered_images_save_dir, f'cluster_{label}', f'{idx}.png')
         image_type = '.png'
         success, img_encoded = cv2.imencode(image_type, img)
         if not success:
             raise ValueError(f"Could not encode image to format: {image_type}")
         img_encoded.tofile(img_path)
 
-
 if __name__ == '__main__':
 
-    classes_path = r'D:\wayho\oil_detection\yolov5\dataset\oil\have_labels\labels\classes.txt'
-    img_path_list = r'data/data_list/labeled_image_path_list.txt'
-    save_dir = r'exp/clustered_images'  # 保存图像的目录
+    classes_path = r'data/classes.txt'
+    img_path_list = r'C:\Users\zcc\project\python_project\my_utils\exp\data_list_all_20240805.txt'
+    clustered_images_save_dir = r'exp/clustered_images'  # 保存图像的目录
 
-    img_paths = read_path_list(img_path_list)
+    with open(img_path_list, 'r') as fin:
+        img_paths = [line.strip() for line in fin]
+
     img_paths.sort()
-    print(f"image length:{len(img_paths)}")
+    print(f"image length: {len(img_paths)}")
     label_paths = [path.replace('images', 'labels').replace(os.path.splitext(path)[1], '.txt') for path in img_paths]
-    print(f"label length:{len(label_paths)}")
-    classes = read_path_list(classes_path)
+    print(f"label length: {len(label_paths)}")
+
+    with open(classes_path, 'r') as fin:
+        classes = [line.strip() for line in fin]
     print(classes)
 
     labeled_imgs = []
+    img_labels = []  # 用于保存每个标签的聚类结果
     for i in tqdm(range(len(img_paths))):
         try:
             img = cv2.imdecode(np.fromfile(img_paths[i], dtype=np.uint8), cv2.IMREAD_UNCHANGED)
+
         except Exception as e:
             print(e)
             continue
@@ -55,6 +59,7 @@ if __name__ == '__main__':
             print(e)
             continue
 
+        labeled_img_label = []
         for label in yolo_labels:
             class_id, x_center, y_center, width, height = label
             x1 = int((x_center - width / 2) * img.shape[1])
@@ -63,7 +68,12 @@ if __name__ == '__main__':
             y2 = int((y_center + height / 2) * img.shape[0])
             labeled_img = img[y1:y2, x1:x2, :]
             resized_img = cv2.resize(labeled_img, (128, 128))
+            # 标签区域的图像
             labeled_imgs.append(resized_img)
+            # 每张图像对应的所有标签
+            labeled_img_label.append(class_id)
+        img_labels.append(labeled_img_label)  # 记录标签索引
+
 
     print(f"Number of labeled images: {len(labeled_imgs)}")
 
@@ -76,11 +86,29 @@ if __name__ == '__main__':
     pca_result = pca.fit_transform(flat_imgs)
 
     # K-means 聚类
-    kmeans = KMeans(n_clusters=3)  # 假设我们要分成 5 类
+    kmeans = KMeans(n_clusters=3)  # 假设我们要分成 3 类
     kmeans.fit(pca_result)
-    labels = kmeans.labels_
+    clustered_labels = kmeans.labels_
 
-    print(f"Cluster labels: {labels}")
+    print(f"Cluster labels: {len(clustered_labels)}")
 
-    # 保存图像到对应的类别文件夹
-    save_images(labeled_imgs, labels, save_dir)
+    clustered_labels_idx = 0
+    for label_path in tqdm(label_paths):
+        try:
+            yolo_labels = read_yolo_labels(label_path)
+            new_labels = []
+            for i, yolo_label in enumerate(yolo_labels):
+                class_id, x_center, y_center, width, height = yolo_label
+                new_class_id = img_labels[clustered_labels_idx]  # 使用聚类后的类别
+                clustered_labels_idx += 1
+                new_labels.append([new_class_id, x_center, y_center, width, height])
+            label_save_path = label_path.replace('labels','clustered_labels')
+            # 保存新的标签
+            save_yolo_labels(new_labels, label_save_path)
+        except Exception as e:
+            print(f"Error updating label  {label_path}: {e}")
+
+
+
+    # 保存图像和更新标签到对应的类别文件夹
+    save_clustered_images(labeled_imgs,clustered_labels, clustered_images_save_dir)
