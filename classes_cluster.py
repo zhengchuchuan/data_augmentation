@@ -44,7 +44,6 @@ if __name__ == '__main__':
     print(classes)
 
     labeled_imgs = []
-    img_labels = []  # 用于保存每个标签的聚类结果
     for i in tqdm(range(len(img_paths))):
         try:
             img = cv2.imdecode(np.fromfile(img_paths[i], dtype=np.uint8), cv2.IMREAD_UNCHANGED)
@@ -59,7 +58,6 @@ if __name__ == '__main__':
             print(e)
             continue
 
-        labeled_img_label = []
         for label in yolo_labels:
             class_id, x_center, y_center, width, height = label
             x1 = int((x_center - width / 2) * img.shape[1])
@@ -71,8 +69,6 @@ if __name__ == '__main__':
             # 标签区域的图像
             labeled_imgs.append(resized_img)
             # 每张图像对应的所有标签
-            labeled_img_label.append(class_id)
-        img_labels.append(labeled_img_label)  # 记录标签索引
 
 
     print(f"Number of labeled images: {len(labeled_imgs)}")
@@ -93,16 +89,18 @@ if __name__ == '__main__':
     print(f"Cluster labels: {len(clustered_labels)}")
 
     clustered_labels_idx = 0
-    for label_path in tqdm(label_paths):
+    for i,label_path in tqdm(enumerate(label_paths)):
         try:
             yolo_labels = read_yolo_labels(label_path)
             new_labels = []
-            for i, yolo_label in enumerate(yolo_labels):
+            for j, yolo_label in enumerate(yolo_labels):
                 class_id, x_center, y_center, width, height = yolo_label
-                new_class_id = img_labels[clustered_labels_idx]  # 使用聚类后的类别
+                new_class_id = clustered_labels[clustered_labels_idx]  # 使用聚类后的类别
                 clustered_labels_idx += 1
                 new_labels.append([new_class_id, x_center, y_center, width, height])
             label_save_path = label_path.replace('labels','clustered_labels')
+            if not os.path.exists(os.path.dirname(label_save_path)):
+                os.makedirs(os.path.dirname(label_save_path))
             # 保存新的标签
             save_yolo_labels(new_labels, label_save_path)
         except Exception as e:
