@@ -9,4 +9,5 @@ gen
 
 
 data/*
-experiment/*
+!data/get_file_list.py
+exp/*
