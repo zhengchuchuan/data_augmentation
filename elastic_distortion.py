@@ -3,12 +3,9 @@ import random
 
 import cv2
 import numpy as np
-from shapely import MultiPolygon
 from tqdm import tqdm
-from shapely.geometry import Polygon
-from shapely.ops import unary_union
 
-from utils.utils import generate_random_transform_matrix, rectangle_union, validate_polygon, get_bounding_box
+from utils.utils import generate_random_transform_matrix, get_bounding_box
 from utils.transforms import elastic_transform, perspective_transform_with_mask
 from utils.data_process import xywh_rect_to_x1y1x2y2
 from utils.file_io import make_sure_paths_exist, read_lines_to_list

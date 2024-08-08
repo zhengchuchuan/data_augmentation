@@ -60,8 +60,19 @@ def perspective_transform(image,M):
     # 应用透视变换
     transformed_image = cv2.warpPerspective(image, new_M, (new_w, new_h), flags=cv2.INTER_CUBIC)
 
+    # 去除空白边缘
+    # 找到前3个通道都为0或者255的边缘区域
+    gray = cv2.cvtColor(transformed_image, cv2.COLOR_BGR2GRAY)
+    _, alpha = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY)
 
-    return transformed_image
+    # 找到非空白区域的边界
+    coords = cv2.findNonZero(alpha)
+    x, y, w, h = cv2.boundingRect(coords)
+
+    # 裁剪图像
+    cropped_image = transformed_image[y:y+h, x:x+w]
+
+    return cropped_image
 
 
 def perspective_transform_with_mask(image, mask, M, points):

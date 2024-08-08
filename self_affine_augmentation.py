@@ -10,13 +10,13 @@ from utils.transforms import elastic_transform, perspective_transform
 from utils.file_io import make_sure_paths_exist, read_lines_to_list
 from utils.utils import generate_random_transform_matrix
 
-generate_nums = 150
+generate_nums = 10
 transform_times = 6
 max_layers = 5
 start_idx = 0
 
 foreground_list_path = r'data/data_list/20240801_generate_foreground_list_2.txt'
-save_img_path = r'\\192.168.3.155\高光谱测试样本库\原油检测\00大庆现场测试\03标注数据以及模型文件\Generate\20240801\generate_foreground\2'
+save_img_path = r'exp/test'
 make_sure_paths_exist(save_img_path, save_img_path)
 
 foreground_path_list = read_lines_to_list(foreground_list_path)
@@ -68,7 +68,6 @@ for i, foreground_path in enumerate(tqdm(foreground_path_list)):
                         max_sale = 1.2
                     transform_matrix = generate_random_transform_matrix(layer_img.shape,
                                                                         scale_range=(min_scale, max_sale),
-                                                                        # Reduced range
                                                                         rotation_range=(-15, 15),  # Reduced range
                                                                         translation_range=(-0.1, 0.1),  # Reduced range
                                                                         shear_range=(-10, 10))  # Reduced range
@@ -79,12 +78,14 @@ for i, foreground_path in enumerate(tqdm(foreground_path_list)):
 
                     layer_img = elastic_transform(image=layer_img, alpha=foreground_height * alpha_ratio,
                                                   sigma=foreground_height * sigma_ratio)
+
             layer_imgs.append(layer_img)
 
         max_height = max([layer_img.shape[0] for layer_img in layer_imgs])
         max_width = max([layer_img.shape[1] for layer_img in layer_imgs])
 
         augmented_img = np.zeros((max_height, max_width, 4), dtype=np.uint8)
+
         for layer_img in layer_imgs:
             h, w = layer_img.shape[:2]
             y = random.randint(0, max_height - h)

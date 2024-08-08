@@ -9,5 +9,5 @@ gen
 
 
 data/*
-!data/get_file_list.py
+!get_file_list.py
 exp/*
