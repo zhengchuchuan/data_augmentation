@@ -13,21 +13,19 @@ from utils.file_io import make_sure_paths_exist, read_lines_to_list
 from utils.img_label_utils import read_yolo_labels, read_labelme_json, yolo_to_labelme_json, save_labelme_json, \
     labelme_json_to_yolo, save_yolo_labels, points_to_yolo_label
 
-per_background_nums = 10
+per_background_nums = 1
 min_paste_nums = 2
 max_paste_nums = 4
 
 
 classes_path = 'data/labels/classes.txt'
-save_img_path = r'\\192.168.3.155\高光谱测试样本库\原油检测\00大庆现场测试\03标注数据以及模型文件\Generate\20240801\imgs'
-save_label_path = r'\\192.168.3.155\高光谱测试样本库\原油检测\00大庆现场测试\03标注数据以及模型文件\Generate\20240801\labels'
+save_images_path = r'\\192.168.3.155\高光谱测试样本库\原油检测\00大庆现场测试\03标注数据以及模型文件\00数据和标签\dataset_20240806_one_label\generate_images\20240813_2\images'
 
-background_list_path = r'\\192.168.3.155\高光谱测试样本库\原油检测\00大庆现场测试\03标注数据以及模型文件\Generate\20240801\20240801_background_list.txt'
-foreground_list_path = r'\\192.168.3.155\高光谱测试样本库\原油检测\00大庆现场测试\03标注数据以及模型文件\Generate\20240801\20240801_generate_foreground_list.txt'
-background_label_dir = r'\\192.168.3.155\高光谱测试样本库\原油检测\00大庆现场测试\03标注数据以及模型文件\00数据和标签\dataset8\have_label\label'
+foreground_list_path = r'data/data_list/20240813_generated_samples_list.txt'
+background_list_path = r'data/data_list/20240813_background_list.txt'
 
-
-make_sure_paths_exist(save_img_path, save_label_path)
+save_label_path = save_images_path.replace('\images', '\labels')
+make_sure_paths_exist(save_images_path, save_label_path)
 
 background_list = read_lines_to_list(background_list_path)
 foreground_list = read_lines_to_list(foreground_list_path)
@@ -41,7 +39,8 @@ for i, background_path in enumerate(tqdm(background_list)):
     background_base_name = os.path.splitext(os.path.basename(background_path))[0]
     background_height, background_width, _ = background_img.shape
 
-    background_path_without_suffix = os.path.join(background_label_dir, background_base_name)
+    background_path_without_suffix = os.path.splitext(background_path.replace('images', 'labels'))[0]
+
     if os.path.exists(background_path_without_suffix + '.txt'):
         background_label_path = background_path_without_suffix + '.txt'
     elif os.path.exists(background_path_without_suffix + '.json'):
@@ -58,15 +57,17 @@ for i, background_path in enumerate(tqdm(background_list)):
             background_labels = labelme_json_to_yolo(background_labelme_data, classes)
         else:
             raise ValueError(f'Unsupported label file format: {background_label_path}')
-
+    else:
+        background_labels = []
     for j in range(per_background_nums):
         fusion_img = background_img.copy()
-        fusion_labels = background_labels.copy() if background_label_path is not None else []
+        fusion_labels = background_labels.copy()
 
         alpha_ratio = random.uniform(0.2, 0.3)
         sigma_ratio = random.uniform(0.02, 0.06)
-        fusion_img = elastic_transform(fusion_img, alpha=background_height * alpha_ratio,
-                                       sigma=background_height * sigma_ratio)
+        # 背景弹性变换
+        # fusion_img = elastic_transform(fusion_img, alpha=background_height * alpha_ratio,
+        #                                sigma=background_height * sigma_ratio)
 
 
         paste_nums = random.randint(min_paste_nums, max_paste_nums)
@@ -142,7 +143,7 @@ for i, background_path in enumerate(tqdm(background_list)):
         formatted_date = now.strftime("%Y%m%d")
 
         result_img_name = f'{formatted_date}_{background_base_name}_{j}.png'
-        result_img_path = os.path.join(save_img_path, result_img_name)
+        result_img_path = os.path.join(save_images_path, result_img_name)
         image_type = '.png'
         success, img_encoded = cv2.imencode(image_type, fusion_img)
         if not success:

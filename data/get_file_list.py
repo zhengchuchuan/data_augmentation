@@ -1,6 +1,8 @@
 import glob
 import os
 import sys
+from datetime import datetime
+
 from tqdm import tqdm
 
 def get_data_path(file_paths, suffixes=None, prefix=None, file_name_pattern=None, process_folders=None,
@@ -33,11 +35,10 @@ def get_data_path(file_paths, suffixes=None, prefix=None, file_name_pattern=None
 
     return filename_list
 
-data_dirs = [r'\\192.168.3.155\高光谱测试样本库\原油检测\00大庆现场测试\03标注数据以及模型文件\Generate\samples\select_20240731']
+data_dirs = [r'\\192.168.3.155\高光谱测试样本库\原油检测\00大庆现场测试\03标注数据以及模型文件\00数据和标签\dataset_20240806_one_label\generate_samples\20240813_1\0']
 save_dir = "data_list"
-# list_name = '20240729_foreground_list.txt'
-# list_name = '20240801_background_list.txt'
-list_name = '20240801_source_foreground_list.txt'
+now = datetime.now()
+list_name = now.strftime("%Y%m%d") + '_generated_samples_list.txt'
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
 
